@@ -10,8 +10,3 @@ gitops_credential_id: "gitea-gitops-credential"
 app_name: "fastapi-demo"
 environment: "dev"
 target_namespace: ""
-
-registry_url: "registry.example.local"
-registry_project: "demo"
-registry_credential_id: "suse-registry-credential"
-registry_ca_cert_credential_id: "suse-registry-ca-cert"

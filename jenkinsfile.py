@@ -13,6 +13,29 @@ def render_jenkinsfile(config: DemoConfig, analysis: RepositoryAnalysis) -> str:
         "://", "://${GITOPS_USER}:${GITOPS_TOKEN}@", 1
     )
 
+    # Check if registry information is provided
+    if config.registry_credential_id and config.registry_ca_cert_credential_id:
+        # Use registry credentials if available
+        registry_section = f"""        withCredentials([
+          usernamePassword(credentialsId: '{config.registry_credential_id}', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD'),
+          file(credentialsId: '{config.registry_ca_cert_credential_id}', variable: 'REGISTRY_CA_CERT')
+        ]) {{
+          sh '''
+            set -eu
+            mkdir -p /kaniko/ssl/certs /kaniko/.docker
+            cp "$REGISTRY_CA_CERT" /kaniko/ssl/certs/registry-ca.crt
+            REGISTRY_AUTH=$(printf '%s:%s' "$REGISTRY_USER" "$REGISTRY_PASSWORD" | base64 | tr -d '\\n')
+            printf '{{"auths":{{"%s":{{"auth":"%s"}}}}}}' '{config.registry_url}' "$REGISTRY_AUTH" > /kaniko/.docker/config.json
+            {build_commands}
+          '''
+        }}"""
+    else:
+        # Use simplified build commands without registry authentication
+        registry_section = f"""        sh '''
+            set -eu
+            {build_commands}
+          '''"""
+
     return f"""podTemplate(
   containers: [
     containerTemplate(name: 'kaniko', image: 'gcr.io/kaniko-project/executor:debug', command: 'sleep', args: '99d'),
@@ -26,19 +49,7 @@ def render_jenkinsfile(config: DemoConfig, analysis: RepositoryAnalysis) -> str:
 
     stage('Build and Push Images') {{
       container('kaniko') {{
-        withCredentials([
-          usernamePassword(credentialsId: '{config.registry_credential_id}', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD'),
-          file(credentialsId: '{config.registry_ca_cert_credential_id}', variable: 'REGISTRY_CA_CERT')
-        ]) {{
-          sh '''
-            set -eu
-            mkdir -p /kaniko/ssl/certs /kaniko/.docker
-            cp "$REGISTRY_CA_CERT" /kaniko/ssl/certs/registry-ca.crt
-            REGISTRY_AUTH=$(printf '%s:%s' "$REGISTRY_USER" "$REGISTRY_PASSWORD" | base64 | tr -d '\\n')
-            printf '{{"auths":{{"%s":{{"auth":"%s"}}}}}}' '{config.registry_url}' "$REGISTRY_AUTH" > /kaniko/.docker/config.json
-{build_commands}
-          '''
-        }}
+        {registry_section}
       }}
     }}
 
@@ -53,7 +64,7 @@ def render_jenkinsfile(config: DemoConfig, analysis: RepositoryAnalysis) -> str:
             cd gitops-repo
             git config user.email "k8s-deploy-agent@example.local"
             git config user.name "k8s-deploy-agent"
-{manifest_commands}
+            {manifest_commands}
             git add {config.gitops_path}
             git commit -m "Update {config.app_name} images ${{BUILD_NUMBER}}"
             git push origin {config.gitops_branch}
