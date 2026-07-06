@@ -76,6 +76,8 @@ Secret 값은 config에 직접 넣지 않는다. Agent와 Jenkinsfile은 credent
 
 ### 5.1 dry-run 실행
 
+이 명령은 Claude Code나 Codex CLI가 아니라 일반 터미널에서 실행할 수 있다.
+
 ```bash
 uv run k8s-deploy-agent dry-run \
   --config .agent/config/demo-inputs.example.yaml \

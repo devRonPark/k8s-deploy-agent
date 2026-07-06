@@ -46,7 +46,14 @@ Source repository
 
 ## CLI 예시
 
-상위 프로젝트에 `pyproject.toml`과 `.agent/config/demo-inputs.example.yaml`이 있는 구조에서는 아래처럼 실행한다.
+이 repository를 clone한 뒤 일반 터미널에서 바로 실행할 수 있다.
+
+```bash
+uv run k8s-deploy-agent --version
+uv run pytest -q
+```
+
+dry-run 실행:
 
 ```bash
 uv run k8s-deploy-agent dry-run \
@@ -54,6 +61,9 @@ uv run k8s-deploy-agent dry-run \
   --repo /path/to/source-repo \
   --output ./out/demo
 ```
+
+`/path/to/source-repo`에는 분석 대상 애플리케이션 repository 경로를 넣는다.
+예상 구조는 `backend/Dockerfile`, `frontend/Dockerfile`처럼 service별 Dockerfile이 있는 repository다.
 
 생성 결과:
 
@@ -65,6 +75,25 @@ out/demo/gitops/base/namespace.yaml
 out/demo/gitops/apps/<service>/deployment.yaml
 out/demo/gitops/apps/<service>/service.yaml
 out/demo/gitops/apps/<service>/configmap.yaml
+```
+
+## Demo 입력 파일
+
+기본 예시는 `.agent/config/demo-inputs.example.yaml`에 있다.
+
+Secret 값은 입력하지 않는다. Jenkins credential ID만 config에 넣는다.
+
+```yaml
+source_credential_id: "gitea-source-credential"
+gitops_credential_id: "gitea-gitops-credential"
+registry_credential_id: "suse-registry-credential"
+registry_ca_cert_credential_id: "suse-registry-ca-cert"
+```
+
+## 검증
+
+```bash
+uv run pytest -q
 ```
 
 ## 현재 Demo 범위 밖
