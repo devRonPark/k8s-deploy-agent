@@ -1,0 +1,26 @@
+name: Task
+description: Track a harness task
+title: "[Task] "
+labels: ["task"]
+body:
+  - type: input
+    id: plans-task
+    attributes:
+      label: Plans.md Task
+      placeholder: "1.1"
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What should change?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance
+      description: Runnable command or objective check
+    validations:
+      required: true

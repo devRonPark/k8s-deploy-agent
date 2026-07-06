@@ -1,11 +1,12 @@
-source_repo_url: "https://gitea.example.local/platform/fastapi-demo.git"
-source_branch: "main"
-source_credential_id: "gitea-source-credential"
+source_repo_url: "https://github.com/devRonPark/full-stack-fastapi-template.git"
+source_branch: "master"
+source_credential_id: "github-source-credential"
+source_access_token_env: "K8S_DEPLOY_AGENT_SOURCE_TOKEN"
 
-gitops_repo_url: "https://gitea.example.local/platform/fastapi-demo-gitops.git"
+gitops_repo_url: "https://github.com/devRonPark/k8s-deploy-agent-demo-gitops.git"
 gitops_branch: "main"
 gitops_path: "."
-gitops_credential_id: "gitea-gitops-credential"
+gitops_credential_id: "github-gitops-credential"
 
 app_name: "fastapi-demo"
 environment: "dev"

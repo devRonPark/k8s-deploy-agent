@@ -13,6 +13,8 @@
 Source repository
   -> Agent repository 분석
   -> service 및 Dockerfile 탐지
+  -> BuildProfile evidence 생성
+  -> Dockerfile/.dockerignore proposal preview 생성
   -> Jenkinsfile 생성
   -> repository analysis report 생성
   -> Rancher Fleet용 GitOps manifest 생성
@@ -39,6 +41,7 @@ Source repository
 | `source_repo_url` | 분석 대상 Source repository URL |
 | `source_branch` | Source branch |
 | `source_credential_id` | Jenkins Source repository credential ID |
+| `source_access_token_env` | dry-run clone에 사용할 source access token 환경변수 이름 |
 | `gitops_repo_url` | GitOps repository URL |
 | `gitops_credential_id` | Jenkins GitOps repository credential ID |
 | `app_name` | 애플리케이션 이름 |
@@ -49,6 +52,7 @@ Source repository
 | `registry_ca_cert_credential_id` | Self-signed CA secret file credential ID |
 
 Secret 값은 config에 직접 넣지 않는다. Agent와 Jenkinsfile은 credential ID만 사용한다.
+private source repository clone이 필요하면 token 값은 `source_access_token_env`가 가리키는 환경변수에만 둔다.
 
 ## 4. Demo 대상 Repository
 
@@ -68,9 +72,11 @@ Secret 값은 config에 직접 넣지 않는다. Agent와 Jenkinsfile은 credent
 | `package.json` | `node` |
 | `pyproject.toml`, `requirements.txt` | `python` |
 | `pom.xml`, `build.gradle` | `java` |
-| `go.mod` | `unsupported` |
+| `go.mod` | `go` |
 
-`unsupported` stack이거나 Dockerfile이 없는 service는 Jenkinsfile/GitOps manifest 생성 대상에서 제외한다.
+repository root에 대표 파일이 있는 단일 앱 repository도 service 후보로 감지한다.
+
+`unsupported` stack이거나 Dockerfile이 없는 service는 Jenkinsfile/GitOps manifest 생성 대상에서 제외한다. 단, BuildProfile gate를 통과하면 Dockerfile/`.dockerignore` proposal은 `dockerfile-proposals/` 아래 review-only artifact로 생성될 수 있다.
 
 ## 5. 시연 절차
 
@@ -81,14 +87,16 @@ Secret 값은 config에 직접 넣지 않는다. Agent와 Jenkinsfile은 credent
 ```bash
 uv run k8s-deploy-agent dry-run \
   --config .agent/config/demo-inputs.example.yaml \
-  --repo /path/to/fastapi-demo-source \
   --output ./out/demo
 ```
+
+이 명령은 config의 `source_repo_url`, `source_branch`, `source_access_token_env`를 사용해 source repository를 임시 clone한 뒤 분석한다.
+이미 로컬에 clone한 repository를 분석하려면 `--repo /path/to/fastapi-demo-source`를 추가한다.
 
 기대 출력:
 
 ```text
-dry-run complete: 10 files written to ./out/demo
+dry-run complete: 16 files written to ./out/demo
 ```
 
 ### 5.2 생성 파일 확인
@@ -102,6 +110,11 @@ find ./out/demo -type f | sort
 ```text
 out/demo/.agent/reports/repository-analysis.md
 out/demo/Jenkinsfile
+out/demo/dockerfile-proposals/VALIDATION.md
+out/demo/dockerfile-proposals/backend/.dockerignore
+out/demo/dockerfile-proposals/backend/Dockerfile
+out/demo/dockerfile-proposals/frontend/.dockerignore
+out/demo/dockerfile-proposals/frontend/Dockerfile
 out/demo/gitops/fleet.yaml
 out/demo/gitops/base/namespace.yaml
 out/demo/gitops/apps/backend/configmap.yaml
@@ -110,6 +123,7 @@ out/demo/gitops/apps/backend/service.yaml
 out/demo/gitops/apps/frontend/configmap.yaml
 out/demo/gitops/apps/frontend/deployment.yaml
 out/demo/gitops/apps/frontend/service.yaml
+out/demo/index.html
 ```
 
 ### 5.3 분석 리포트 확인
@@ -122,9 +136,25 @@ cat ./out/demo/.agent/reports/repository-analysis.md
 
 - `backend`와 `frontend` service가 표시된다.
 - 각 service의 stack과 Dockerfile 경로가 표시된다.
+- `Build Profiles` 섹션에 build tool, runtime command, port, confidence가 표시된다.
+- `Build Profile Evidence` 섹션에 감지 근거 파일과 reason이 표시된다.
 - Secret 값이 포함되지 않는다.
 
-### 5.4 Jenkinsfile 확인
+### 5.4 Dockerfile proposal 확인
+
+```bash
+find ./out/demo/dockerfile-proposals -type f | sort
+cat ./out/demo/dockerfile-proposals/VALIDATION.md
+```
+
+검증 포인트:
+
+- proposal artifact가 `dockerfile-proposals/` 아래에만 있다.
+- Python/Node.js service의 Dockerfile proposal이 생성된다.
+- `.dockerignore` proposal이 생성된다.
+- validation report에서 secret redaction, review-only output, confidence gate가 pass 상태다.
+
+### 5.5 Jenkinsfile 확인
 
 ```bash
 sed -n '1,220p' ./out/demo/Jenkinsfile
@@ -151,6 +181,7 @@ Demo 성공 기준:
 - 분석 리포트에 service와 Dockerfile 경로가 표시된다.
 - Jenkinsfile에 `Checkout Source`, `Build and Push Images`, `Update GitOps Repository` 흐름이 포함된다.
 - GitOps manifest가 service별로 생성된다.
+- Dockerfile/`.dockerignore` proposal과 `VALIDATION.md`가 review-only artifact로 생성된다.
 - 산출물에 secret 값이 포함되지 않는다.
 - 관련 pytest가 통과한다.
 
@@ -159,6 +190,6 @@ Demo 성공 기준:
 - Gitea webhook 자동 trigger
 - Rancher Fleet `GitRepo` 자동 등록
 - 실제 cluster rollout 검증
-- Dockerfile 자동 생성
+- Dockerfile/source repository 자동 write-back
 - Helm/Kustomize 고급 overlay 생성
 - 외부 SaaS LLM 호출

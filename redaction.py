@@ -11,6 +11,9 @@ SECRET_ASSIGNMENT_RE = re.compile(
     r"(?P<value>['\"]?[A-Za-z0-9][A-Za-z0-9._~:/+=@-]{8,}['\"]?)",
     re.IGNORECASE,
 )
+SECRET_VALUE_RE = re.compile(
+    r"(github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,})"
+)
 
 
 @dataclass(frozen=True)
@@ -24,6 +27,9 @@ def find_secret_leaks(files: Mapping[str, str]) -> list[SecretLeak]:
     leaks: list[SecretLeak] = []
     for path, content in files.items():
         for line_number, line in enumerate(content.splitlines(), start=1):
+            if SECRET_VALUE_RE.search(line):
+                leaks.append(SecretLeak(path=path, line_number=line_number, key="secret_value"))
+                continue
             match = SECRET_ASSIGNMENT_RE.search(line)
             if not match:
                 continue

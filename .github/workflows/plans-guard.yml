@@ -1,0 +1,96 @@
+name: Plans Guard
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: plans-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-plans:
+    name: Plans.md schema and WIP acceptance
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Validate Plans.md
+        shell: bash
+        run: |
+          if [ ! -f Plans.md ]; then
+            echo "Plans.md is required"
+            exit 1
+          fi
+
+          expected='|Task|내용|DoD|Acceptance|Depends|Status|GH|'
+          header=$(grep -E '^\|[[:space:]]*Task[[:space:]]*\|' Plans.md | head -n 1 | sed -E 's/[[:space:]]+//g')
+          if [ "$header" != "$expected" ]; then
+            echo "Plans.md header must be: | Task | 내용 | DoD | Acceptance | Depends | Status | GH |"
+            exit 1
+          fi
+
+          failed=0
+          wip_found=0
+
+          while IFS= read -r line; do
+            [[ "$line" =~ ^[[:space:]]*\|[[:space:]]*[-:] ]] && continue
+            [[ "$line" != *"|"* ]] && continue
+            line="${line%"${line##*[![:space:]]}"}"
+            line="${line%|}"
+            IFS='|' read -ra fields <<< "$line"
+            n=${#fields[@]}
+            [ "$n" -lt 8 ] && continue
+
+            task_id=$(echo "${fields[1]}" | xargs)
+            content=$(echo "${fields[2]}" | xargs)
+            dod=$(echo "${fields[3]}" | xargs)
+            status=$(echo "${fields[n-2]}" | xargs)
+            [[ ! "$task_id" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] && continue
+
+            if [ -z "$dod" ] || [ "$dod" = "-" ]; then
+              echo "Task ${task_id}: DoD is required"
+              failed=1
+            fi
+            if [[ "$content" =~ (전체|모든|[[:space:]]및[[:space:]]|그리고) ]]; then
+              echo "Task ${task_id}: content is too broad: ${content}"
+              failed=1
+            fi
+
+            if [ "$status" != "cc:WIP" ]; then
+              continue
+            fi
+            wip_found=$((wip_found + 1))
+
+            acceptance=""
+            for ((i=4; i<=n-4; i++)); do
+              [ -n "$acceptance" ] && acceptance+="|"
+              acceptance+="${fields[i]}"
+            done
+            acceptance=$(echo "$acceptance" | sed 's/\\|/|/g; s/^[[:space:]]*//; s/[[:space:]]*$//')
+
+            if [ -z "$acceptance" ] || [ "$acceptance" = "-" ]; then
+              echo "Task ${task_id}: WIP task has no acceptance command"
+              failed=1
+              continue
+            fi
+
+            echo "Running acceptance for Task ${task_id}: ${acceptance}"
+            if ! eval "$acceptance"; then
+              echo "Task ${task_id}: acceptance failed"
+              failed=1
+            fi
+          done < Plans.md
+
+          if [ "$wip_found" -eq 0 ]; then
+            echo "No WIP task found"
+          fi
+          exit "$failed"

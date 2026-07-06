@@ -33,6 +33,7 @@ class DemoConfig:
     registry_project: Optional[str] = None
     registry_credential_id: Optional[str] = None
     registry_ca_cert_credential_id: Optional[str] = None
+    source_access_token_env: Optional[str] = None
     target_namespace: str | None = None
 
     @classmethod
@@ -44,7 +45,13 @@ class DemoConfig:
 
         data = {field: str(values[field]).strip() for field in REQUIRED_FIELDS}
         # Handle optional registry fields
-        optional_fields = ["registry_url", "registry_project", "registry_credential_id", "registry_ca_cert_credential_id"]
+        optional_fields = [
+            "registry_url",
+            "registry_project",
+            "registry_credential_id",
+            "registry_ca_cert_credential_id",
+            "source_access_token_env",
+        ]
         for field in optional_fields:
             data[field] = str(values.get(field, "")).strip() or None
         target_namespace = str(values.get("target_namespace", "")).strip() or None

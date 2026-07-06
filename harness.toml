@@ -1,0 +1,57 @@
+# Harness configuration for Codex CLI workflow.
+
+[project]
+name = "k8s-deploy-agent"
+version = "0.1.0"
+description = "On-premise Kubernetes migration agent that analyzes source repositories and generates Jenkins CI plus Rancher Fleet GitOps assets."
+
+[runtime]
+agent = "codex-cli"
+language = "python"
+package_manager = "uv"
+python = ">=3.11"
+
+[commands]
+test = "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q"
+dry_run = "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run k8s-deploy-agent dry-run --config .agent/config/demo-inputs.example.yaml --output ./out/demo"
+
+[safety.permissions]
+deny = [
+  "sudo",
+  "git push --force",
+]
+ask = [
+  "rm -r",
+  "rm -rf",
+  "git push",
+]
+
+[safety.files]
+secret_values_forbidden = true
+protected = [
+  ".env",
+  "secrets/**",
+]
+
+[github]
+enabled = false
+default_branch = "main"
+task_branch_prefix = "task/"
+
+[review]
+require_before_pr = true
+focus = [
+  "secret leakage",
+  "offline runtime compatibility",
+  "generated CI/GitOps correctness",
+  "test coverage",
+]
+
+[test]
+auto_run = true
+agent = "agents/test-agent.md"
+
+[plan]
+auto_run = true
+agent = "agents/task-decomposer.md"
+gate_work = true
