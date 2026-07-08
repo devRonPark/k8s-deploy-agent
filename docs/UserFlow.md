@@ -8,7 +8,7 @@
 
 ```text
 Open local operator console
-  -> enter project and repository inputs
+  -> choose source input mode and enter project/repository inputs
   -> validate credential references and target naming
   -> run dry-run analysis
   -> review detected services, BuildProfiles, and migration risks
@@ -38,7 +38,7 @@ k8s-deploy-agent dry-run --config .agent/config/demo-inputs.example.yaml --outpu
 | Screen | Purpose | Inputs | Outputs | Blocking Errors |
 |--------|---------|--------|---------|-----------------|
 | Project Onboarding | Collect migration scope and internal system references | app name, environment, namespace, repo URLs, branches, paths, credential IDs, token env var names | validated config payload | missing required field, raw secret-like input, invalid namespace |
-| Repository Access | Confirm source and GitOps access references before execution | source repo URL/ref, credential ID, optional token env name, GitOps target | access summary | clone/auth failure, missing credential reference |
+| Repository Access | Confirm source and GitOps access references before execution | source input mode, source repo URL/ref, optional server local repo path, credential ID, optional token env name, GitOps target | access summary | clone/auth failure, missing local path, unreadable local directory, missing credential reference |
 | Repository Analysis | Show what the agent found in the source tree | local clone or local repo path | file summary, services, stacks, Dockerfile status, BuildProfile evidence, unsupported risks | no source tree, unsupported structure, analyzer failure |
 | Generated Asset Preview | Let operator inspect generated files | dry-run config and analysis result | report, Jenkinsfile, Fleet config, Namespace, Deployment, Service, ConfigMap, Dockerfile proposal artifacts | renderer failure, missing expected generated asset |
 | Validation Checklist | Separate review gates from generation | generated files, config metadata, analysis result | pass/fail checklist and blocking reasons | redaction failure, invalid image name, invalid namespace, missing required manifest |
@@ -54,6 +54,8 @@ k8s-deploy-agent dry-run --config .agent/config/demo-inputs.example.yaml --outpu
 | target namespace | `payments-dev` | Must remain Kubernetes-compatible |
 | source repository URL | `https://gitea.internal/acme/payments-api.git` | Internal URL |
 | source branch | `main` | Ref to analyze |
+| source input mode | `clone` or `local` | `clone` uses source repo URL/branch; `local` analyzes a server filesystem path |
+| local source repository path | `/srv/repos/payments-api` | Used only in `local` mode; dry-run output stays outside the source repo |
 | source credential ID | `gitea-source-credential` | Raw secret forbidden |
 | source access token env | `K8S_DEPLOY_AGENT_SOURCE_TOKEN` | Environment variable name only |
 | GitOps repository URL | `https://gitea.internal/acme/fleet-apps.git` | Internal URL |
@@ -89,6 +91,7 @@ Validation runs in two layers.
 | Error | User-facing State | Expected Recovery |
 |-------|-------------------|-------------------|
 | Repository clone failure | Source access failed | Check URL, branch, credential ID, or token environment variable |
+| Local repository path invalid | Source access failed | Enter an existing directory path on the web server filesystem |
 | Missing credential ID | Input validation blocked | Enter the credential ID configured in Jenkins/GitOps/registry systems |
 | Raw secret-like value detected | Input validation blocked | Replace the value with a credential ID or environment variable name |
 | Unsupported stack | Analysis needs review | Operator decides whether to exclude or handle manually |

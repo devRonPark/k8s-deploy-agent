@@ -72,3 +72,26 @@ Append meaningful work and errors here. Keep task status in `Plans.md`.
 - Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 17 passed.
 - Added `docs/AgentWorkflowOverview.md` as a manager-facing current workflow overview for source repository analysis through Kubernetes dry-run asset generation, validation, and operator review.
 - Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 17 passed.
+
+## 2026-07-08
+
+- Implemented task 5.1: added `clone`/`local` source input mode selection to the local web operator console.
+- Added local source repository path validation with `Path.expanduser().resolve()`, directory checks, invalid mode blocking, and dry-run error blocking for `ValueError`/`OSError`/`PermissionError`.
+- Preserved submitted source mode and local path in the web form after validation or dry-run.
+- Documented source input mode behavior in `docs/UserFlow.md` and `docs/Architecture.md`, including local mode output-only behavior.
+- Added tests for source mode controls, default clone behavior, valid local repo dry-run generation, invalid local paths, invalid mode blocking, clone mode ignoring local path, and form value retention.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 22 passed.
+- Localized the web operator console in `web.py` to Korean for user-facing form labels, section titles, buttons, workflow copy, validation/dry-run messages, checklist text, and local path validation errors while preserving technical identifiers, form field names, and mode values.
+- Updated web console tests in `tests/test_cli_dry_run.py` to assert the Korean UI text and localized validation errors while retaining checks for offline-first and secret-safe HTML.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 22 passed.
+- Tightened task 5.1 validation: `local` source input mode now validates only `local_source_repo_path` for source selection, normalizes it into dry-run compatible internal source placeholders, and still redaction-checks the raw submitted form values.
+- Added tests for duplicate form input names, clone-only required source fields, local mode with empty clone fields, invalid local paths, clone mode ignoring local path, and local-mode secret-like rejection.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_cli_dry_run.py -q`: 20 passed.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 27 passed.
+- Implemented task 6.1: refreshed the local web operator console into a step-based workflow covering input, validation, dry-run, analysis/asset review, and checklist.
+- Grouped the console form into 작업 대상, Source repository, GitOps target, and Private registry sections without changing submitted field names or endpoints.
+- Added a run summary strip and grouped generated asset preview sections for repository analysis, CI pipeline, GitOps base, service manifests, and Dockerfile proposals.
+- Kept On-prem LLM review and write-back preparation as inactive future panels; no LLM endpoint, push, commit, or source/GitOps write-back behavior was added.
+- Updated UI regression tests for the step workflow, grouped inputs, grouped preview, offline-first HTML, and duplicate input-name guard.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_cli_dry_run.py -q`: 20 passed.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 27 passed.

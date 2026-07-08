@@ -15,24 +15,51 @@ from k8s_deploy_agent.redaction import assert_no_secret_values
 
 
 FORM_FIELDS: tuple[tuple[str, str, str], ...] = (
-    ("app_name", "Application name", "payments-api"),
-    ("environment", "Environment", "dev"),
-    ("target_namespace", "Target namespace", "payments-dev"),
+    ("app_name", "애플리케이션 이름", "payments-api"),
+    ("environment", "환경", "dev"),
+    ("target_namespace", "대상 namespace", "payments-dev"),
     ("source_repo_url", "Source repository URL", "internal source repository"),
     ("source_branch", "Source branch", "main"),
-    ("source_credential_id", "Source credential ID", "credential ID only"),
+    ("source_credential_id", "Source credential ID", "credential ID만 입력"),
     ("source_access_token_env", "Source access token env", "K8S_DEPLOY_AGENT_SOURCE_TOKEN"),
     ("gitops_repo_url", "GitOps repository URL", "internal GitOps repository"),
     ("gitops_branch", "GitOps branch", "main"),
     ("gitops_path", "GitOps path", "apps/payments-api"),
-    ("gitops_credential_id", "GitOps credential ID", "credential ID only"),
+    ("gitops_credential_id", "GitOps credential ID", "credential ID만 입력"),
     ("registry_url", "Registry URL", "registry.internal/acme"),
     ("registry_project", "Registry project", "payments"),
-    ("registry_credential_id", "Registry credential ID", "credential ID only"),
-    ("registry_ca_cert_credential_id", "Registry CA credential ID", "credential ID only"),
+    ("registry_credential_id", "Registry credential ID", "credential ID만 입력"),
+    ("registry_ca_cert_credential_id", "Registry CA credential ID", "credential ID만 입력"),
 )
+FORM_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "작업 대상",
+        "application 이름, 환경, namespace를 먼저 고정합니다.",
+        ("app_name", "environment", "target_namespace"),
+    ),
+    (
+        "Source repository",
+        "clone 또는 서버 local path 중 하나로 분석 대상을 선택합니다.",
+        ("source_repo_url", "source_branch", "source_credential_id", "source_access_token_env"),
+    ),
+    (
+        "GitOps target",
+        "Rancher Fleet 산출물이 놓일 내부 GitOps repository 위치입니다.",
+        ("gitops_repo_url", "gitops_branch", "gitops_path", "gitops_credential_id"),
+    ),
+    (
+        "Private registry",
+        "이미지 이름 생성에 사용할 내부 registry 정보입니다.",
+        ("registry_url", "registry_project", "registry_credential_id", "registry_ca_cert_credential_id"),
+    ),
+)
+FORM_FIELD_LOOKUP = {name: (label, placeholder) for name, label, placeholder in FORM_FIELDS}
 
 ENV_VAR_NAME_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
+SOURCE_INPUT_MODES = {"clone", "local"}
+DEFAULT_SOURCE_INPUT_MODE = "clone"
+LOCAL_SOURCE_REPO_PATH_FIELD = "local_source_repo_path"
+SOURCE_INPUT_MODE_FIELD = "source_input_mode"
 
 
 @dataclass(frozen=True)
@@ -43,7 +70,7 @@ class ConsoleValidationResult:
 
     @property
     def status_label(self) -> str:
-        return "valid" if self.ok else "needs review"
+        return "검증 완료" if self.ok else "검토 필요"
 
 
 @dataclass(frozen=True)
@@ -58,23 +85,44 @@ class ConsoleDryRunResult:
 
 def validate_console_payload(values: Mapping[str, str]) -> ConsoleValidationResult:
     payload = {field: str(values.get(field, "")).strip() for field, _, _ in FORM_FIELDS}
+    source_input_mode = _source_input_mode(values)
+    local_source_repo_path = str(values.get(LOCAL_SOURCE_REPO_PATH_FIELD, "")).strip()
     messages: list[str] = []
     config: DemoConfig | None = None
+
+    source_env = payload.get("source_access_token_env", "")
+    if source_env and not ENV_VAR_NAME_RE.fullmatch(source_env):
+        messages.append(
+            "source_access_token_env는 대문자 환경변수 이름이어야 합니다"
+        )
+
+    if source_input_mode not in SOURCE_INPUT_MODES:
+        messages.append("source_input_mode는 clone 또는 local이어야 합니다")
+    elif source_input_mode == "local":
+        local_repo_path, local_path_errors = _resolve_local_source_repo_path(local_source_repo_path)
+        messages.extend(local_path_errors)
+        if local_repo_path is not None:
+            local_source_repo_path = str(local_repo_path)
+            payload = {
+                **payload,
+                "source_repo_url": local_source_repo_path,
+                "source_branch": "local",
+                "source_credential_id": "local-source",
+            }
 
     try:
         config = DemoConfig.from_mapping(payload)
     except ValueError as error:
         messages.append(str(error))
 
-    source_env = payload.get("source_access_token_env", "")
-    if source_env and not ENV_VAR_NAME_RE.fullmatch(source_env):
-        messages.append(
-            "source_access_token_env must be an uppercase environment variable name"
-        )
-
+    redaction_values = {
+        **{field: str(values.get(field, "")).strip() for field, _, _ in FORM_FIELDS},
+        SOURCE_INPUT_MODE_FIELD: source_input_mode,
+        LOCAL_SOURCE_REPO_PATH_FIELD: local_source_repo_path,
+    }
     redaction_probe = "\n".join(
         f"{field}: {value}"
-        for field, value in payload.items()
+        for field, value in redaction_values.items()
         if value and field != "source_access_token_env"
     )
     if redaction_probe:
@@ -97,11 +145,35 @@ def run_console_dry_run(values: Mapping[str, str]) -> ConsoleDryRunResult:
         )
 
     output_dir = tempfile.mkdtemp(prefix="k8s-deploy-agent-web-")
+    source_input_mode = _source_input_mode(values)
+    repo_path: str | None = None
+    if source_input_mode == "local":
+        local_repo_path, local_path_errors = _resolve_local_source_repo_path(
+            str(values.get(LOCAL_SOURCE_REPO_PATH_FIELD, "")).strip()
+        )
+        if local_path_errors or local_repo_path is None:
+            return ConsoleDryRunResult(
+                ok=False,
+                messages=tuple(local_path_errors),
+                config=validation.config,
+                validation=validation,
+                output_dir=output_dir,
+            )
+        repo_path = str(local_repo_path)
+    elif source_input_mode != "clone":
+        return ConsoleDryRunResult(
+            ok=False,
+            messages=("source_input_mode는 clone 또는 local이어야 합니다",),
+            config=validation.config,
+            validation=validation,
+            output_dir=output_dir,
+        )
+
     try:
         from k8s_deploy_agent.cli import run_dry_run_with_config
 
-        generated_paths = run_dry_run_with_config(validation.config, None, output_dir)
-    except ValueError as error:
+        generated_paths = run_dry_run_with_config(validation.config, repo_path, output_dir)
+    except (ValueError, OSError, PermissionError) as error:
         return ConsoleDryRunResult(
             ok=False,
             messages=(str(error),),
@@ -123,16 +195,19 @@ def run_console_dry_run(values: Mapping[str, str]) -> ConsoleDryRunResult:
 def render_operator_console(
     validation: ConsoleValidationResult | None = None,
     dry_run: ConsoleDryRunResult | None = None,
+    form_values: Mapping[str, str] | None = None,
 ) -> str:
     validation_html = _render_validation_result(validation)
     dry_run_html = _render_dry_run_result(dry_run)
     preview_html = _render_generated_asset_preview(dry_run)
     checklist_html = _render_validation_checklist(dry_run)
+    stepper_html = _render_workflow_stepper(validation, dry_run)
+    summary_html = _render_run_summary(validation, dry_run)
     status_class = "warn"
-    status_label = "awaiting input"
+    status_label = "입력 대기"
     if dry_run is not None:
         status_class = "ok" if dry_run.ok else "blocked"
-        status_label = "dry-run complete" if dry_run.ok else "dry-run blocked"
+        status_label = "dry-run 완료" if dry_run.ok else "dry-run 차단"
     elif validation is not None:
         status_class = "ok" if validation.ok else "blocked"
         status_label = validation.status_label
@@ -201,6 +276,62 @@ def render_operator_console(
       gap: 16px;
       align-items: start;
     }
+    .workflow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .step {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      min-height: 72px;
+      padding: 10px 12px;
+    }
+    .step strong {
+      display: block;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+    .step span {
+      color: var(--muted);
+      display: block;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    .step.ok {
+      border-color: #a9dfc7;
+      background: #f4fbf8;
+    }
+    .step.blocked {
+      border-color: #f1b8b2;
+      background: #fff8f7;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .summary-item {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      min-height: 72px;
+      padding: 12px;
+    }
+    .summary-item span {
+      color: var(--muted);
+      display: block;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+    .summary-item strong {
+      display: block;
+      font-size: 17px;
+      overflow-wrap: anywhere;
+    }
     section {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -236,6 +367,42 @@ def render_operator_console(
       font-size: 12px;
       font-weight: 600;
     }
+    fieldset {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 10px;
+    }
+    fieldset.form-group {
+      padding: 12px;
+    }
+    legend {
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 0 4px;
+    }
+    .radio-row {
+      display: grid;
+      gap: 8px;
+    }
+    .radio-option {
+      align-items: center;
+      display: flex;
+      gap: 8px;
+      min-height: 24px;
+    }
+    .field-grid {
+      display: grid;
+      gap: 10px;
+    }
+    .group-note {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 0;
+    }
     input {
       width: 100%;
       min-height: 36px;
@@ -244,6 +411,11 @@ def render_operator_console(
       color: var(--ink);
       font: inherit;
       padding: 7px 9px;
+    }
+    input[type="radio"] {
+      width: 16px;
+      min-height: 16px;
+      padding: 0;
     }
     input:disabled {
       background: #f2f5f9;
@@ -290,6 +462,20 @@ def render_operator_console(
       display: block;
       font-size: 12px;
       margin-top: 8px;
+    }
+    .future-panel {
+      display: grid;
+      gap: 10px;
+    }
+    .future-row {
+      border: 1px dashed var(--line);
+      border-radius: 7px;
+      padding: 10px 12px;
+    }
+    .future-row p {
+      color: var(--muted);
+      margin: 4px 0 0;
+      font-size: 13px;
     }
     .pill {
       display: inline-flex;
@@ -353,6 +539,41 @@ def render_operator_console(
     .result-list li + li {
       margin-top: 6px;
     }
+    .asset-groups {
+      display: grid;
+      gap: 12px;
+    }
+    .asset-group {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      overflow: hidden;
+    }
+    .asset-group-title {
+      align-items: center;
+      background: #fbfcfe;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+    }
+    .artifact {
+      padding: 12px;
+    }
+    .artifact + .artifact {
+      border-top: 1px solid var(--line);
+    }
+    pre {
+      background: #101828;
+      border-radius: 6px;
+      color: #f8fafc;
+      font-size: 12px;
+      margin: 10px 0 0;
+      max-height: 220px;
+      overflow: auto;
+      padding: 10px;
+      white-space: pre-wrap;
+    }
     code {
       background: #eef2f7;
       border: 1px solid #dfe5ee;
@@ -365,7 +586,7 @@ def render_operator_console(
         align-items: flex-start;
         flex-direction: column;
       }
-      .layout, .cards {
+      .layout, .cards, .workflow, .summary-grid {
         grid-template-columns: 1fr;
       }
     }
@@ -376,25 +597,27 @@ def render_operator_console(
     <div class="wrap topbar">
       <div class="brand">
         <strong>k8s-deploy-agent operator console</strong>
-        <span>Local web UI for on-premise Kubernetes migration preparation</span>
+        <span>온프레미스 Kubernetes migration 준비를 위한 local web UI</span>
       </div>
       <div class="status">offline-first · loopback server</div>
     </div>
   </header>
   <main class="wrap">
+    __WORKFLOW_STEPPER__
+    __RUN_SUMMARY__
     <div class="layout">
       <section>
         <div class="section-head">
-          <h2>Project Onboarding</h2>
-          <span class="pill warn">form shell</span>
+          <h2>1. 입력</h2>
+          <span class="pill warn">입력 form</span>
         </div>
         <div class="panel-body">
             <form class="form-grid" method="post" action="/validate">
             __FORM_INPUTS__
             <div class="button-row">
-              <button type="submit">Validate payload</button>
-              <button type="submit" formaction="/dry-run">Run dry-run</button>
-              <button type="reset" class="secondary">Clear</button>
+              <button type="submit">입력 검증</button>
+              <button type="submit" formaction="/dry-run">dry-run 실행</button>
+              <button type="reset" class="secondary">초기화</button>
             </div>
           </form>
         </div>
@@ -402,7 +625,7 @@ def render_operator_console(
       <div class="stack">
         <section>
           <div class="section-head">
-            <h2>Validation Result</h2>
+            <h2>2. 검증</h2>
             <span class="pill __STATUS_CLASS__">__STATUS_LABEL__</span>
           </div>
           <div class="panel-body result">
@@ -411,7 +634,7 @@ def render_operator_console(
         </section>
         <section>
           <div class="section-head">
-            <h2>Dry-run Execution</h2>
+            <h2>3. dry-run</h2>
             <span class="pill __DRY_RUN_CLASS__">__DRY_RUN_LABEL__</span>
           </div>
           <div class="panel-body result">
@@ -420,7 +643,7 @@ def render_operator_console(
         </section>
         <section>
           <div class="section-head">
-            <h2>Generated Asset Preview</h2>
+            <h2>4. 분석 / 산출물 리뷰</h2>
             <span class="pill __PREVIEW_CLASS__">__PREVIEW_LABEL__</span>
           </div>
           <div class="panel-body result">
@@ -429,27 +652,23 @@ def render_operator_console(
         </section>
         <section>
           <div class="section-head">
-            <h2>Workflow</h2>
-            <span class="pill ok">local</span>
+            <h2>향후 확장</h2>
+            <span class="pill warn">비활성</span>
           </div>
-          <div class="panel-body cards">
-            <div class="card">
-              <h3>1. Validate Inputs</h3>
-              <span>Collect credential IDs and environment variable names. Raw secret values stay out of UI state.</span>
+          <div class="panel-body future-panel">
+            <div class="future-row">
+              <h3>On-prem LLM review</h3>
+              <p>이번 개편에서는 recommendation panel을 실행하지 않습니다. dry-run 흐름은 LLM 없이 완료됩니다.</p>
             </div>
-            <div class="card">
-              <h3>2. Run Dry-run</h3>
-              <span>Reuse the existing analyzer, renderers, and redaction guard from the CLI pipeline.</span>
-            </div>
-            <div class="card">
-              <h3>3. Review Assets</h3>
-              <span>Preview report, Jenkinsfile, Fleet config, and Kubernetes manifests before export.</span>
+            <div class="future-row">
+              <h3>Write-back preparation</h3>
+              <p>source/GitOps repository 변경은 validation gate 이후 별도 작업으로 유지합니다.</p>
             </div>
           </div>
         </section>
         <section>
           <div class="section-head">
-            <h2>Validation Checklist</h2>
+            <h2>5. 검증 checklist</h2>
             <span class="pill __CHECKLIST_CLASS__">__CHECKLIST_LABEL__</span>
           </div>
           __CHECKLIST_HTML__
@@ -461,42 +680,106 @@ def render_operator_console(
 </html>
 """
     return (
-        template.replace("__FORM_INPUTS__", _form_inputs())
+        template.replace("__FORM_INPUTS__", _form_inputs(form_values))
+        .replace("__WORKFLOW_STEPPER__", stepper_html)
+        .replace("__RUN_SUMMARY__", summary_html)
         .replace("__STATUS_CLASS__", status_class)
         .replace("__STATUS_LABEL__", status_label)
         .replace("__VALIDATION_HTML__", validation_html)
         .replace("__DRY_RUN_CLASS__", "ok" if dry_run and dry_run.ok else ("blocked" if dry_run else "warn"))
         .replace(
             "__DRY_RUN_LABEL__",
-            "completed" if dry_run and dry_run.ok else ("needs review" if dry_run else "awaiting run"),
+            "완료" if dry_run and dry_run.ok else ("검토 필요" if dry_run else "실행 대기"),
         )
         .replace("__DRY_RUN_HTML__", dry_run_html)
         .replace("__PREVIEW_CLASS__", "ok" if dry_run and dry_run.ok else ("blocked" if dry_run else "warn"))
         .replace(
             "__PREVIEW_LABEL__",
-            "ready" if dry_run and dry_run.ok else ("blocked" if dry_run else "awaiting run"),
+            "준비 완료" if dry_run and dry_run.ok else ("차단" if dry_run else "실행 대기"),
         )
         .replace("__PREVIEW_HTML__", preview_html)
         .replace("__CHECKLIST_CLASS__", "ok" if dry_run and dry_run.ok else ("warn" if dry_run else "blocked"))
         .replace(
             "__CHECKLIST_LABEL__",
-            "pass" if dry_run and dry_run.ok else ("pending" if dry_run is None else "blocked"),
+            "통과" if dry_run and dry_run.ok else ("대기" if dry_run is None else "차단"),
         )
         .replace("__CHECKLIST_HTML__", checklist_html)
     )
 
 
+def _render_workflow_stepper(
+    validation: ConsoleValidationResult | None,
+    dry_run: ConsoleDryRunResult | None,
+) -> str:
+    validation_status = "ok" if validation and validation.ok else ("blocked" if validation else "warn")
+    dry_run_status = "ok" if dry_run and dry_run.ok else ("blocked" if dry_run else "warn")
+    review_status = "ok" if dry_run and dry_run.ok else ("blocked" if dry_run else "warn")
+    checklist_status = "ok" if dry_run and dry_run.ok else ("blocked" if dry_run and not dry_run.ok else "warn")
+    steps = (
+        ("1", "입력", "대상과 내부 시스템 참조 입력", "ok"),
+        ("2", "검증", "필수값과 secret-like 값 차단", validation_status),
+        ("3", "dry-run", "기존 CLI pipeline 실행", dry_run_status),
+        ("4", "리뷰", "분석 결과와 생성 파일 확인", review_status),
+        ("5", "checklist", "write-back 전 blocking 조건 확인", checklist_status),
+    )
+    items = "\n".join(
+        f"""<div class="step {escape(status)}">
+          <strong>{escape(number)}. {escape(title)}</strong>
+          <span>{escape(description)}</span>
+        </div>"""
+        for number, title, description, status in steps
+    )
+    return f'<div class="workflow" aria-label="operator workflow">{items}</div>'
+
+
+def _render_run_summary(
+    validation: ConsoleValidationResult | None,
+    dry_run: ConsoleDryRunResult | None,
+) -> str:
+    config = dry_run.config if dry_run and dry_run.config else validation.config if validation else None
+    app_name = config.app_name if config else "-"
+    namespace = config.namespace if config else "-"
+    generated_count = str(len(dry_run.generated_paths)) if dry_run and dry_run.ok else "0"
+    if dry_run is None:
+        run_state = "실행 대기"
+    elif dry_run.ok:
+        run_state = "dry-run 완료"
+    else:
+        run_state = "차단"
+    output_dir = dry_run.output_dir if dry_run and dry_run.output_dir else "-"
+    items = (
+        ("Application", app_name),
+        ("Namespace", namespace),
+        ("Run state", run_state),
+        ("Generated files", generated_count),
+    )
+    summary_items = "\n".join(
+        f"""<div class="summary-item">
+          <span>{escape(label)}</span>
+          <strong>{escape(value)}</strong>
+        </div>"""
+        for label, value in items
+    )
+    return f"""<div class="summary-grid" aria-label="run summary">
+      {summary_items}
+      <div class="summary-item">
+        <span>Output dir</span>
+        <strong>{escape(output_dir)}</strong>
+      </div>
+    </div>"""
+
+
 def _render_validation_result(result: ConsoleValidationResult | None) -> str:
     if result is None:
         return (
-            '<p class="result-note">Awaiting validation. '
-            "The console accepts `DemoConfig` compatible payloads and blocks raw secret-like values.</p>"
+            '<p class="result-note">검증 대기 중입니다. '
+            "이 console은 `DemoConfig` 호환 payload를 받고 raw secret 유사 값을 차단합니다.</p>"
         )
 
     if result.ok and result.config is not None:
         items = [
-            ("Application", result.config.app_name),
-            ("Environment", result.config.environment),
+            ("애플리케이션", result.config.app_name),
+            ("환경", result.config.environment),
             ("Namespace", result.config.namespace),
             ("Source repo", result.config.source_repo_url),
             ("GitOps repo", result.config.gitops_repo_url),
@@ -505,78 +788,96 @@ def _render_validation_result(result: ConsoleValidationResult | None) -> str:
             f"<li><strong>{escape(label)}</strong>: <code>{escape(value)}</code></li>" for label, value in items
         )
         return f"""
-<span class="pill ok">validated</span>
-<p class="result-note">Payload accepted. The console can hand the config to the existing dry-run pipeline.</p>
+<span class="pill ok">검증 완료</span>
+<p class="result-note">Payload가 승인되었습니다. 이 console은 config를 기존 dry-run pipeline에 전달할 수 있습니다.</p>
 <ul class="result-list">{details}</ul>
 """
 
     messages = "".join(f"<li>{escape(message)}</li>" for message in result.messages)
     return f"""
-<span class="pill blocked">blocked</span>
-<p class="result-note">Payload rejected. Review the errors below before running dry-run or export preparation.</p>
+<span class="pill blocked">차단</span>
+<p class="result-note">Payload가 거부되었습니다. dry-run 또는 export 준비 전에 아래 오류를 검토하세요.</p>
 <ul class="result-list">{messages}</ul>
 """
 
 
 def _render_dry_run_result(result: ConsoleDryRunResult | None) -> str:
     if result is None:
-        return '<p class="result-note">Submit the form with <code>Run dry-run</code> to generate assets in a local output directory.</p>'
+        return '<p class="result-note"><code>dry-run 실행</code>으로 form을 제출하면 local output directory에 asset을 생성합니다.</p>'
 
     if result.ok and result.config is not None and result.output_dir is not None:
         items = [
             ("Output dir", result.output_dir),
-            ("Generated files", ", ".join(result.generated_paths) if result.generated_paths else "-"),
+            ("생성 파일", ", ".join(result.generated_paths) if result.generated_paths else "-"),
             ("Namespace", result.config.namespace),
         ]
         details = "".join(
             f"<li><strong>{escape(label)}</strong>: <code>{escape(value)}</code></li>" for label, value in items
         )
         return f"""
-<span class="pill ok">completed</span>
-<p class="result-note">Dry-run reused the existing pipeline and wrote local assets for review.</p>
+<span class="pill ok">완료</span>
+<p class="result-note">dry-run이 기존 pipeline을 재사용해 검토용 local asset을 작성했습니다.</p>
 <ul class="result-list">{details}</ul>
 """
 
     messages = "".join(f"<li>{escape(message)}</li>" for message in result.messages)
     return f"""
-<span class="pill blocked">blocked</span>
-<p class="result-note">Dry-run did not complete. Fix the blocking issue and rerun.</p>
+<span class="pill blocked">차단</span>
+<p class="result-note">dry-run이 완료되지 않았습니다. 차단 원인을 수정한 뒤 다시 실행하세요.</p>
 <ul class="result-list">{messages}</ul>
 """
 
 
 def _render_generated_asset_preview(result: ConsoleDryRunResult | None) -> str:
     if result is None:
-        return '<p class="result-note">Run dry-run to inspect generated files from the local output directory.</p>'
+        return '<p class="result-note">생성 파일을 local output directory에서 확인하려면 dry-run을 실행하세요.</p>'
 
     if not result.ok or result.output_dir is None:
-        return '<p class="result-note">Generated asset preview is unavailable until dry-run completes successfully.</p>'
+        return '<p class="result-note">dry-run이 성공적으로 완료될 때까지 생성 asset preview를 사용할 수 없습니다.</p>'
 
     output_dir = Path(result.output_dir)
-    preview_paths = (
-        ".agent/reports/repository-analysis.md",
-        "dockerfile-proposals/VALIDATION.md",
-        "Jenkinsfile",
-        "gitops/fleet.yaml",
-        "gitops/base/namespace.yaml",
+    preview_groups = (
+        ("Repository analysis", (".agent/reports/repository-analysis.md",)),
+        ("CI pipeline", ("Jenkinsfile",)),
+        ("GitOps base", ("gitops/fleet.yaml", "gitops/base/namespace.yaml")),
+        (
+            "Service manifests",
+            tuple(path for path in result.generated_paths if path.startswith("gitops/apps/")),
+        ),
+        (
+            "Dockerfile proposals",
+            tuple(path for path in result.generated_paths if path.startswith("dockerfile-proposals/")),
+        ),
     )
-    items = []
-    for relative_path in preview_paths:
-        file_path = output_dir / relative_path
-        if not file_path.is_file():
-            continue
-        snippet = "\n".join(file_path.read_text(encoding="utf-8").splitlines()[:8])
-        items.append(
-            f"""<details class="artifact" open>
-              <summary><strong>{escape(relative_path)}</strong></summary>
-              <pre style="margin: 10px 0 0; white-space: pre-wrap;">{escape(snippet)}</pre>
-            </details>"""
-        )
+    groups = []
+    for title, relative_paths in preview_groups:
+        artifacts = []
+        for relative_path in relative_paths:
+            file_path = output_dir / relative_path
+            if not file_path.is_file():
+                continue
+            snippet = "\n".join(file_path.read_text(encoding="utf-8").splitlines()[:8])
+            artifacts.append(
+                f"""<details class="artifact">
+                  <summary><strong>{escape(relative_path)}</strong></summary>
+                  <pre>{escape(snippet)}</pre>
+                </details>"""
+            )
+        if artifacts:
+            groups.append(
+                f"""<div class="asset-group">
+                  <div class="asset-group-title">
+                    <h3>{escape(title)}</h3>
+                    <span class="pill">{len(artifacts)}개</span>
+                  </div>
+                  {''.join(artifacts)}
+                </div>"""
+            )
 
-    if not items:
-        return '<p class="result-note">No previewable files were found in the local output directory.</p>'
+    if not groups:
+        return '<p class="result-note">local output directory에서 preview 가능한 파일을 찾지 못했습니다.</p>'
 
-    return "".join(items)
+    return f'<div class="asset-groups">{"".join(groups)}</div>'
 
 
 def _render_validation_checklist(result: ConsoleDryRunResult | None) -> str:
@@ -586,23 +887,23 @@ def _render_validation_checklist(result: ConsoleDryRunResult | None) -> str:
   <div class="check">
     <div>
       <h3>Secret redaction</h3>
-      <p><code>assert_no_secret_values</code> must pass before write-back preparation.</p>
+      <p>write-back 준비 전에 <code>assert_no_secret_values</code>가 통과해야 합니다.</p>
     </div>
-    <span class="pill warn">pending</span>
+    <span class="pill warn">대기</span>
   </div>
   <div class="check">
     <div>
-      <h3>Generated assets</h3>
-      <p>Report, Jenkinsfile, Fleet config, Namespace, Deployment, Service, and ConfigMap must exist.</p>
+      <h3>생성 assets</h3>
+      <p>Report, Jenkinsfile, Fleet config, Namespace, Deployment, Service, ConfigMap이 존재해야 합니다.</p>
     </div>
-    <span class="pill warn">pending</span>
+    <span class="pill warn">대기</span>
   </div>
   <div class="check">
     <div>
       <h3>On-prem LLM</h3>
-      <p>Recommendations are optional review text and never mutate generated files automatically.</p>
+      <p>추천 내용은 선택 검토 텍스트이며 생성 파일을 자동 변경하지 않습니다.</p>
     </div>
-    <span class="pill ok">optional</span>
+    <span class="pill ok">선택</span>
   </div>
 </div>
 """
@@ -614,23 +915,23 @@ def _render_validation_checklist(result: ConsoleDryRunResult | None) -> str:
   <div class="check">
     <div>
       <h3>Secret redaction</h3>
-      <p>Validation blocked before write-back preparation.</p>
+      <p>write-back 준비 전에 검증이 차단되었습니다.</p>
     </div>
-    <span class="pill blocked">blocked</span>
+    <span class="pill blocked">차단</span>
   </div>
   <div class="check">
     <div>
-      <h3>Generated assets</h3>
-      <p>Preview and manifest checks are unavailable until dry-run succeeds.</p>
+      <h3>생성 assets</h3>
+      <p>dry-run이 성공할 때까지 preview와 manifest 검사를 사용할 수 없습니다.</p>
     </div>
-    <span class="pill blocked">blocked</span>
+    <span class="pill blocked">차단</span>
   </div>
   <div class="check">
     <div>
-      <h3>Dry-run errors</h3>
+      <h3>dry-run 오류</h3>
       <ul class="result-list">{messages}</ul>
     </div>
-    <span class="pill blocked">blocked</span>
+    <span class="pill blocked">차단</span>
   </div>
 </div>
 """
@@ -654,54 +955,112 @@ def _render_validation_checklist(result: ConsoleDryRunResult | None) -> str:
     checklist = [
         (
             "Secret redaction",
-            "assert_no_secret_values passed on generated assets.",
+            "생성 assets에서 assert_no_secret_values가 통과했습니다.",
             "ok" if secret_ok else "blocked",
         ),
         (
-            "Generated assets",
-            "Report, Jenkinsfile, Fleet config, and namespace manifest exist." if generated_ok else f"Missing: {', '.join(missing)}",
+            "생성 assets",
+            "Report, Jenkinsfile, Fleet config, namespace manifest가 존재합니다." if generated_ok else f"누락: {', '.join(missing)}",
             "ok" if generated_ok else "blocked",
         ),
         (
-            "Namespace alignment",
-            f"Namespace manifest includes {result.config.namespace}." if namespace_matches else "Namespace manifest does not match the target namespace.",
+            "Namespace 정합성",
+            f"Namespace manifest에 {result.config.namespace}가 포함되어 있습니다." if namespace_matches else "Namespace manifest가 대상 namespace와 일치하지 않습니다.",
             "ok" if namespace_matches else "blocked",
         ),
         (
             "Dockerfile proposals",
-            "Dockerfile/.dockerignore proposals passed review-only validation."
+            "Dockerfile/.dockerignore proposals가 review-only validation을 통과했습니다."
             if dockerfile_validation_ok
-            else "Dockerfile proposal validation is missing or blocked.",
+            else "Dockerfile proposal validation이 없거나 차단되었습니다.",
             "ok" if dockerfile_validation_ok else "blocked",
         ),
         (
             "On-prem LLM",
-            "Recommendations remain review-only and are not auto-applied.",
+            "추천 내용은 review-only로 유지되며 자동 적용되지 않습니다.",
             "ok",
         ),
     ]
+    status_labels = {"ok": "통과", "blocked": "차단", "warn": "대기"}
     items = "\n".join(
         f"""<div class="check">
       <div>
         <h3>{escape(title)}</h3>
         <p>{escape(description)}</p>
       </div>
-      <span class="pill {escape(status)}">{escape(status)}</span>
+      <span class="pill {escape(status)}">{escape(status_labels.get(status, status))}</span>
     </div>"""
         for title, description, status in checklist
     )
     return f'<div class="panel-body checklist">{items}</div>'
 
 
-def _form_inputs() -> str:
-    fields = []
-    for name, label, placeholder in FORM_FIELDS:
-        fields.append(
-            f"""<label>{escape(label)}
-              <input name="{escape(name)}" placeholder="{escape(placeholder)}">
-            </label>"""
+def _source_input_mode(values: Mapping[str, str]) -> str:
+    mode = str(values.get(SOURCE_INPUT_MODE_FIELD, "")).strip()
+    return mode or DEFAULT_SOURCE_INPUT_MODE
+
+
+def _resolve_local_source_repo_path(raw_path: str) -> tuple[Path | None, tuple[str, ...]]:
+    if not raw_path:
+        return None, ("source_input_mode가 local이면 local_source_repo_path가 필요합니다",)
+
+    try:
+        path = Path(raw_path).expanduser().resolve()
+    except (OSError, RuntimeError) as error:
+        return None, (f"local_source_repo_path를 해석할 수 없습니다: {error}",)
+
+    try:
+        if not path.exists():
+            return None, (f"local_source_repo_path가 존재하지 않습니다: {path}",)
+        if not path.is_dir():
+            return None, (f"local_source_repo_path가 directory가 아닙니다: {path}",)
+    except (OSError, PermissionError) as error:
+        return None, (f"local_source_repo_path를 검사할 수 없습니다: {error}",)
+
+    return path, ()
+
+
+def _form_inputs(values: Mapping[str, str] | None = None) -> str:
+    form_values = values or {}
+    selected_mode = _source_input_mode(form_values)
+    mode_options = []
+    for mode, label in (("clone", "source repository URL clone"), ("local", "서버 local path 분석")):
+        checked = " checked" if selected_mode == mode else ""
+        mode_options.append(
+            f"""<label class="radio-option">
+                <input type="radio" name="{escape(SOURCE_INPUT_MODE_FIELD)}" value="{escape(mode)}"{checked}>
+                <span>{escape(label)}</span>
+              </label>"""
         )
-    return "\n".join(fields)
+    local_path_value = str(form_values.get(LOCAL_SOURCE_REPO_PATH_FIELD, "")).strip()
+    groups = []
+    source_mode_controls = f"""<fieldset class="source-mode">
+          <legend>source 입력 mode</legend>
+          <div class="radio-row">{''.join(mode_options)}</div>
+          <label>local source repository path
+            <input name="{escape(LOCAL_SOURCE_REPO_PATH_FIELD)}" value="{escape(local_path_value)}" placeholder="/srv/repos/payments-api">
+          </label>
+        </fieldset>"""
+    for title, note, field_names in FORM_GROUPS:
+        controls = []
+        if title == "Source repository":
+            controls.append(source_mode_controls)
+        for name in field_names:
+            label, placeholder = FORM_FIELD_LOOKUP[name]
+            value = str(form_values.get(name, "")).strip()
+            controls.append(
+                f"""<label>{escape(label)}
+                  <input name="{escape(name)}" value="{escape(value)}" placeholder="{escape(placeholder)}">
+                </label>"""
+            )
+        groups.append(
+            f"""<fieldset class="form-group">
+              <legend>{escape(title)}</legend>
+              <p class="group-note">{escape(note)}</p>
+              <div class="field-grid">{''.join(controls)}</div>
+            </fieldset>"""
+        )
+    return "\n".join(groups)
 
 
 class OperatorConsoleHandler(BaseHTTPRequestHandler):
@@ -732,10 +1091,10 @@ class OperatorConsoleHandler(BaseHTTPRequestHandler):
         payload = {key: values[-1] for key, values in parse_qs(raw_body, keep_blank_values=True).items()}
         if path == "/validate":
             validation = validate_console_payload(payload)
-            body = render_operator_console(validation=validation).encode("utf-8")
+            body = render_operator_console(validation=validation, form_values=payload).encode("utf-8")
         else:
             dry_run = run_console_dry_run(payload)
-            body = render_operator_console(validation=dry_run.validation, dry_run=dry_run).encode("utf-8")
+            body = render_operator_console(validation=dry_run.validation, dry_run=dry_run, form_values=payload).encode("utf-8")
 
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/html; charset=utf-8")

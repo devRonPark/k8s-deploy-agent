@@ -53,6 +53,18 @@
 |------|------|-----|------------|---------|--------|----|
 | 4.1 | root-level app repository 감지 추가 | repository root에 `package.json`, `pyproject.toml`, `requirements.txt`, `pom.xml`, `build.gradle`, 또는 `go.mod`가 있는 단일 앱 repo가 서비스 후보와 BuildProfile로 감지된다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 3.12 | cc:완료 | - |
 
+## Week 5 - Web Local Source Input
+
+| Task | 내용 | DoD | Acceptance | Depends | Status | GH |
+|------|------|-----|------------|---------|--------|----|
+| 5.1 | web form에서 local repo path 분석 지원 | clone/local mode 선택, local path validation, dry-run asset generation, source repo write-back 없음 조건이 구현된다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 2.4 | cc:완료 | - |
+
+## Week 6 - Operator Console UX
+
+| Task | 내용 | DoD | Acceptance | Depends | Status | GH |
+|------|------|-----|------------|---------|--------|----|
+| 6.1 | operator console 단계형 UI/UX 개편 | web console이 입력, 검증, dry-run, 분석/산출물 리뷰, checklist를 단계형 workflow로 보여주고 generated asset preview를 기능별로 묶는다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 5.1 | cc:완료 | - |
+
 ---
 
 <!--

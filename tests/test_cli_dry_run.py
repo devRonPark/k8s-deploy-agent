@@ -1,10 +1,26 @@
 import subprocess
+from collections import Counter
+from html.parser import HTMLParser
 from pathlib import Path
 
 import k8s_deploy_agent.cli as cli
 from k8s_deploy_agent.cli import main
 from k8s_deploy_agent.redaction import find_secret_leaks
 from k8s_deploy_agent.web import render_operator_console, run_console_dry_run, validate_console_payload
+
+
+class InputNameParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.names: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag != "input":
+            return
+        attr_map = dict(attrs)
+        name = attr_map.get("name")
+        if name:
+            self.names.append(name)
 
 
 def write_sample_repo(root: Path) -> Path:
@@ -59,6 +75,28 @@ def init_git_repo(repo: Path) -> None:
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, check=True)
     subprocess.run(["git", "add", "."], cwd=repo, check=True)
     subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=repo, check=True, capture_output=True)
+
+
+def console_payload(**overrides: str) -> dict[str, str]:
+    payload = {
+        "app_name": "fastapi-demo",
+        "environment": "dev",
+        "target_namespace": "fastapi-demo-dev",
+        "source_repo_url": "https://gitea.example.local/team/source.git",
+        "source_branch": "main",
+        "source_credential_id": "gitea-source-credential",
+        "source_access_token_env": "K8S_DEPLOY_AGENT_SOURCE_TOKEN",
+        "gitops_repo_url": "https://gitea.example.local/team/gitops.git",
+        "gitops_branch": "main",
+        "gitops_path": "apps/fastapi-demo",
+        "gitops_credential_id": "gitea-gitops-credential",
+        "registry_url": "registry.example.local",
+        "registry_project": "demo",
+        "registry_credential_id": "suse-registry-credential",
+        "registry_ca_cert_credential_id": "suse-registry-ca-cert",
+    }
+    payload.update(overrides)
+    return payload
 
 
 def test_dry_run_generates_assets_for_root_level_repo(tmp_path):
@@ -213,9 +251,23 @@ def test_operator_console_shell_is_offline_first_and_secret_safe():
     assert 'method="post"' in html
     assert 'action="/validate"' in html
     assert 'formaction="/dry-run"' in html
-    assert "Validate payload" in html
-    assert "Run dry-run" in html
-    assert "credential ID only" in html
+    assert 'name="source_input_mode" value="clone" checked' in html
+    assert 'name="source_input_mode" value="local"' in html
+    assert 'name="local_source_repo_path"' in html
+    assert "입력 검증" in html
+    assert "dry-run 실행" in html
+    assert "credential ID만 입력" in html
+    assert "1. 입력" in html
+    assert "2. 검증" in html
+    assert "3. dry-run" in html
+    assert "4. 분석 / 산출물 리뷰" in html
+    assert "5. 검증 checklist" in html
+    assert "작업 대상" in html
+    assert "GitOps target" in html
+    assert "Private registry" in html
+    assert "source repository URL clone" in html
+    assert "서버 local path 분석" in html
+    assert "향후 확장" in html
     assert "assert_no_secret_values" in html
     assert "<script" not in html
     assert 'href="http' not in html
@@ -223,31 +275,83 @@ def test_operator_console_shell_is_offline_first_and_secret_safe():
     assert 'type="password"' not in html
 
 
+def test_operator_console_form_has_no_duplicate_input_names_except_source_mode_radio_group():
+    parser = InputNameParser()
+    parser.feed(render_operator_console())
+
+    duplicate_names = {
+        name: count
+        for name, count in Counter(parser.names).items()
+        if count > 1
+    }
+
+    assert duplicate_names == {"source_input_mode": 2}
+
+
 def test_console_payload_validation_accepts_demo_config_compatible_input():
-    result = validate_console_payload(
-        {
-            "app_name": "fastapi-demo",
-            "environment": "dev",
-            "target_namespace": "fastapi-demo-dev",
-            "source_repo_url": "https://gitea.example.local/team/source.git",
-            "source_branch": "main",
-            "source_credential_id": "gitea-source-credential",
-            "source_access_token_env": "K8S_DEPLOY_AGENT_SOURCE_TOKEN",
-            "gitops_repo_url": "https://gitea.example.local/team/gitops.git",
-            "gitops_branch": "main",
-            "gitops_path": "apps/fastapi-demo",
-            "gitops_credential_id": "gitea-gitops-credential",
-            "registry_url": "registry.example.local",
-            "registry_project": "demo",
-            "registry_credential_id": "suse-registry-credential",
-            "registry_ca_cert_credential_id": "suse-registry-ca-cert",
-        }
-    )
+    result = validate_console_payload(console_payload())
 
     assert result.ok
     assert result.config is not None
     assert result.config.namespace == "fastapi-demo-dev"
     assert result.messages == ()
+
+
+def test_console_payload_validation_clone_mode_requires_source_clone_fields():
+    result = validate_console_payload(
+        console_payload(
+            source_input_mode="clone",
+            source_repo_url="",
+            source_branch="",
+            source_credential_id="",
+        )
+    )
+
+    assert not result.ok
+    assert any(
+        "Missing required config fields: source_repo_url, source_branch, source_credential_id" in message
+        for message in result.messages
+    )
+
+
+def test_console_payload_validation_local_mode_uses_path_without_clone_fields(tmp_path):
+    repo = write_sample_repo(tmp_path)
+
+    result = validate_console_payload(
+        console_payload(
+            source_input_mode="local",
+            local_source_repo_path=repo.as_posix(),
+            source_repo_url="",
+            source_branch="",
+            source_credential_id="",
+        )
+    )
+
+    assert result.ok
+    assert result.config is not None
+    assert result.config.source_repo_url == repo.resolve().as_posix()
+    assert result.config.source_branch == "local"
+    assert result.config.source_credential_id == "local-source"
+
+
+def test_console_payload_validation_local_mode_blocks_invalid_repo_paths(tmp_path):
+    file_path = tmp_path / "not-a-directory.txt"
+    file_path.write_text("not a repo\n", encoding="utf-8")
+
+    empty_path = validate_console_payload(console_payload(source_input_mode="local", local_source_repo_path=""))
+    missing_path = validate_console_payload(
+        console_payload(source_input_mode="local", local_source_repo_path=(tmp_path / "missing").as_posix())
+    )
+    regular_file = validate_console_payload(
+        console_payload(source_input_mode="local", local_source_repo_path=file_path.as_posix())
+    )
+
+    assert not empty_path.ok
+    assert any("local_source_repo_path가 필요합니다" in message for message in empty_path.messages)
+    assert not missing_path.ok
+    assert any("존재하지 않습니다" in message for message in missing_path.messages)
+    assert not regular_file.ok
+    assert any("directory가 아닙니다" in message for message in regular_file.messages)
 
 
 def test_console_payload_validation_rejects_secret_like_values():
@@ -270,29 +374,30 @@ def test_console_payload_validation_rejects_secret_like_values():
     assert any("Secret value detected" in message for message in result.messages)
 
 
+def test_console_payload_validation_local_mode_rejects_secret_like_values(tmp_path):
+    repo = write_sample_repo(tmp_path)
+
+    result = validate_console_payload(
+        console_payload(
+            source_input_mode="local",
+            local_source_repo_path=repo.as_posix(),
+            source_repo_url="",
+            source_branch="",
+            source_credential_id="",
+            registry_credential_id="github_pat_abcdefghijklmnopqrstuvwxyz1234567890",
+        )
+    )
+
+    assert not result.ok
+    assert result.config is not None
+    assert any("Secret value detected" in message for message in result.messages)
+
+
 def test_console_dry_run_execution_reuses_cli_pipeline(tmp_path):
     repo = write_sample_repo(tmp_path)
     init_git_repo(repo)
 
-    result = run_console_dry_run(
-        {
-            "app_name": "fastapi-demo",
-            "environment": "dev",
-            "target_namespace": "fastapi-demo-dev",
-            "source_repo_url": repo.as_posix(),
-            "source_branch": "main",
-            "source_credential_id": "gitea-source-credential",
-            "source_access_token_env": "K8S_DEPLOY_AGENT_SOURCE_TOKEN",
-            "gitops_repo_url": "https://gitea.example.local/team/gitops.git",
-            "gitops_branch": "main",
-            "gitops_path": "apps/fastapi-demo",
-            "gitops_credential_id": "gitea-gitops-credential",
-            "registry_url": "registry.example.local",
-            "registry_project": "demo",
-            "registry_credential_id": "suse-registry-credential",
-            "registry_ca_cert_credential_id": "suse-registry-ca-cert",
-        }
-    )
+    result = run_console_dry_run(console_payload(source_repo_url=repo.as_posix()))
 
     assert result.ok
     assert result.output_dir is not None
@@ -308,34 +413,95 @@ def test_console_dry_run_preview_and_checklist_render_generated_files(tmp_path):
     repo = write_sample_repo(tmp_path)
     init_git_repo(repo)
 
-    result = run_console_dry_run(
-        {
-            "app_name": "fastapi-demo",
-            "environment": "dev",
-            "target_namespace": "fastapi-demo-dev",
-            "source_repo_url": repo.as_posix(),
-            "source_branch": "main",
-            "source_credential_id": "gitea-source-credential",
-            "source_access_token_env": "K8S_DEPLOY_AGENT_SOURCE_TOKEN",
-            "gitops_repo_url": "https://gitea.example.local/team/gitops.git",
-            "gitops_branch": "main",
-            "gitops_path": "apps/fastapi-demo",
-            "gitops_credential_id": "gitea-gitops-credential",
-            "registry_url": "registry.example.local",
-            "registry_project": "demo",
-            "registry_credential_id": "suse-registry-credential",
-            "registry_ca_cert_credential_id": "suse-registry-ca-cert",
-        }
-    )
+    result = run_console_dry_run(console_payload(source_repo_url=repo.as_posix()))
 
     html = render_operator_console(validation=result.validation, dry_run=result)
 
-    assert "Generated Asset Preview" in html
+    assert "4. 분석 / 산출물 리뷰" in html
+    assert "Repository analysis" in html
+    assert "CI pipeline" in html
+    assert "GitOps base" in html
+    assert "Service manifests" in html
     assert ".agent/reports/repository-analysis.md" in html
     assert "dockerfile-proposals/VALIDATION.md" in html
     assert "Jenkinsfile" in html
-    assert "Validation Checklist" in html
+    assert "5. 검증 checklist" in html
     assert "Dockerfile proposals" in html
-    assert "Namespace alignment" in html
+    assert "Namespace 정합성" in html
     assert "Secret redaction" in html
-    assert "Generated assets" in html
+    assert "생성 assets" in html
+
+
+def test_console_dry_run_local_mode_generates_assets_from_valid_repo_path(tmp_path):
+    repo = write_sample_repo(tmp_path)
+
+    result = run_console_dry_run(
+        console_payload(
+            source_input_mode="local",
+            local_source_repo_path=repo.as_posix(),
+        )
+    )
+
+    assert result.ok
+    assert result.output_dir is not None
+    output_dir = Path(result.output_dir)
+    assert (output_dir / "Jenkinsfile").is_file()
+    assert (output_dir / "gitops/apps/backend/deployment.yaml").is_file()
+    assert (output_dir / "gitops/apps/frontend/deployment.yaml").is_file()
+
+
+def test_console_dry_run_local_mode_blocks_invalid_repo_paths(tmp_path):
+    file_path = tmp_path / "not-a-directory.txt"
+    file_path.write_text("not a repo\n", encoding="utf-8")
+
+    empty_path = run_console_dry_run(console_payload(source_input_mode="local", local_source_repo_path=""))
+    missing_path = run_console_dry_run(
+        console_payload(source_input_mode="local", local_source_repo_path=(tmp_path / "missing").as_posix())
+    )
+    regular_file = run_console_dry_run(
+        console_payload(source_input_mode="local", local_source_repo_path=file_path.as_posix())
+    )
+
+    assert not empty_path.ok
+    assert any("local_source_repo_path가 필요합니다" in message for message in empty_path.messages)
+    assert not missing_path.ok
+    assert any("존재하지 않습니다" in message for message in missing_path.messages)
+    assert not regular_file.ok
+    assert any("directory가 아닙니다" in message for message in regular_file.messages)
+
+
+def test_console_dry_run_blocks_invalid_source_input_mode():
+    result = run_console_dry_run(console_payload(source_input_mode="archive"))
+
+    assert not result.ok
+    assert any("source_input_mode는 clone 또는 local이어야 합니다" in message for message in result.messages)
+
+
+def test_console_clone_mode_ignores_local_source_repo_path(tmp_path):
+    repo = write_sample_repo(tmp_path)
+    init_git_repo(repo)
+    not_a_directory = tmp_path / "ignored-local-path.txt"
+    not_a_directory.write_text("ignored\n", encoding="utf-8")
+
+    result = run_console_dry_run(
+        console_payload(
+            source_input_mode="clone",
+            source_repo_url=repo.as_posix(),
+            local_source_repo_path=not_a_directory.as_posix(),
+        )
+    )
+
+    assert result.ok
+    assert result.output_dir is not None
+    assert (Path(result.output_dir) / "gitops/apps/backend/deployment.yaml").is_file()
+
+
+def test_operator_console_retains_submitted_source_mode_and_local_path(tmp_path):
+    repo = write_sample_repo(tmp_path)
+    payload = console_payload(source_input_mode="local", local_source_repo_path=repo.as_posix())
+    validation = validate_console_payload(payload)
+
+    html = render_operator_console(validation=validation, form_values=payload)
+
+    assert 'name="source_input_mode" value="local" checked' in html
+    assert f'name="local_source_repo_path" value="{repo.as_posix()}"' in html

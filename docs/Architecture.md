@@ -78,6 +78,7 @@ The UI must not require raw secret values.
 ```text
 operator form input
   -> config validator
+  -> source input mode resolver
   -> temporary dry-run config or in-memory config object
   -> source repository adapter
   -> repository analyzer
@@ -88,6 +89,11 @@ operator form input
 ```
 
 The same analyzer and renderers used by CLI dry-run should be used by web dry-run. UI-specific code should not reimplement Jenkinsfile, GitOps, report, or manifest generation.
+
+The web source input mode has two options:
+
+- `clone`: default behavior; clone `source_repo_url` and `source_branch` through the existing source repository adapter.
+- `local`: analyze an existing directory path on the web server filesystem after `Path.expanduser().resolve()` validation. Local mode writes only to the dry-run output directory and never writes back to the source repository.
 
 ### Dockerfile Proposal Planning
 

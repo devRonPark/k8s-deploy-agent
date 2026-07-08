@@ -1,20 +1,20 @@
 # Harness State
 
-Updated: 2026-07-06
+Updated: 2026-07-08
 
 ## Current Snapshot
 
 - Project: k8s-deploy-agent
 - Runtime: Codex CLI
 - Stack: Python 3.11+, uv, pytest
-- Current focus: Dockerfile proposal preview implementation complete on `feature/dockerfile-build-profile`
+- Current focus: operator console step-based UI/UX refresh complete
 - Task source of truth: `Plans.md`
 
 ## Active Task
 
 | Task | Status | Notes |
 |------|--------|-------|
-| 3.8-3.12 | cc:완료 | Node/Java/Go Dockerfile proposals, `.dockerignore` proposals, and proposal validation artifacts are complete |
+| 6.1 | cc:완료 | Web console presents input, validation, dry-run, review, and checklist as a step-based operator workflow |
 
 ## Verification Command
 

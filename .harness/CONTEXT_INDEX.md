@@ -16,8 +16,8 @@ Use this index to avoid rereading unrelated files.
 | `docs/demo-scenario.md` | Current demo workflow |
 | `docs/ui-ux-plan.md` | Future operator console plan |
 | `docs/PRD.md` | Operator console MVP product requirements |
-| `docs/UserFlow.md` | Operator console screen flow, inputs, outputs, and error states |
-| `docs/Architecture.md` | Operator console architecture, boundaries, and verification strategy |
+| `docs/UserFlow.md` | Operator console screen flow, source input modes, inputs, outputs, and error states |
+| `docs/Architecture.md` | Operator console architecture, source input boundaries, and verification strategy |
 | `docs/monthly-demo.md` | Team monthly meeting demo runbook |
 | `docs/DockerfilePlan.md` | Dockerfile writing practices and deterministic build profile planning |
 | `docs/AgentWorkflowOverview.md` | Executive workflow overview for the implemented source-to-Kubernetes preparation flow |
@@ -30,4 +30,4 @@ Use this index to avoid rereading unrelated files.
 | `ui.py` | Static dry-run dashboard renderer |
 | `tests/test_cli_dry_run.py` | Main dry-run behavior tests |
 | `tests/test_build_profile.py` | BuildProfile analyzer behavior tests |
-| `web.py` | Local operator console HTTP server and HTML shell |
+| `web.py` | Local operator console HTTP server, source input mode handling, and HTML shell |
