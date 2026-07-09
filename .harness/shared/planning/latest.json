@@ -1,7 +1,7 @@
 {
-  "run_id": "plan-20260709-161228-c2f2fc",
-  "updated_at": "2026-07-09T16:12:28+09:00",
-  "context": ".harness/shared/planning/runs/plan-20260709-161228-c2f2fc/context.json",
-  "proposal": ".harness/shared/planning/runs/plan-20260709-161228-c2f2fc/proposed-tasks.json",
-  "report": ".harness/shared/planning/runs/plan-20260709-161228-c2f2fc/decomposition-report.md"
+  "run_id": "plan-20260709-172630-6217e9",
+  "updated_at": "2026-07-09T17:26:30+09:00",
+  "context": ".harness/shared/planning/runs/plan-20260709-172630-6217e9/context.json",
+  "proposal": ".harness/shared/planning/runs/plan-20260709-172630-6217e9/proposed-tasks.json",
+  "report": ".harness/shared/planning/runs/plan-20260709-172630-6217e9/decomposition-report.md"
 }

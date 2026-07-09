@@ -1,0 +1,14 @@
+{
+  "tasks": [
+    {
+      "id": "8.9",
+      "title": "fastapi-template 샘플 레포 기준 dry-run 통합 검증 추가",
+      "dod": "tests/fixtures/fastapi_template/에 실제 fastapi/full-stack-fastapi-template의 backend/Dockerfile, backend/app/core/config.py, frontend/Dockerfile, frontend/nginx.conf, compose.yml, .env 핵심 구조를 반영한 고정 fixture를 두고, 이 fixture로 dry-run을 실행해 (1) backend 포트는 근거 없이 confirmed되지 않고 manual action으로 남고, (2) frontend 포트는 nginx listen 80 근거로 confirmed되며, (3) SECRET_KEY/POSTGRES_PASSWORD/FIRST_SUPERUSER_PASSWORD는 secret으로, POSTGRES_SERVER/PROJECT_NAME 등은 configmap 또는 public_config로 분류되고, (4) postgres dependency가 감지되는 것을 검증하는 통합 테스트가 추가된다. 이 중 하나라도 실패하면 8.1~8.7의 analyzer/manifest_plan/gitops 로직을 재조정한다.",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_fastapi_template_fixture.py",
+      "depends": ["8.7"],
+      "status": "todo",
+      "gh": "-",
+      "section": "Week 8 - Evidence-based GitOps Manifest Planning"
+    }
+  ]
+}
