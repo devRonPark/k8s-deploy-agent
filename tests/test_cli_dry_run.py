@@ -272,6 +272,9 @@ def test_operator_console_shell_is_offline_first_and_secret_safe():
     assert "GitOps target" in html
     assert "Private registry" in html
     assert "source repository URL clone" in html
+    assert "FastAPI public sample" in html
+    assert 'formaction="/sample"' in html
+    assert "https://github.com/fastapi/full-stack-fastapi-template.git" in html
     assert "서버 local path 분석" in html
     assert "향후 확장" in html
     assert "assert_no_secret_values" in html
@@ -318,6 +321,48 @@ def test_console_payload_validation_clone_mode_requires_source_clone_fields():
         "Missing required config fields: source_repo_url, source_branch, source_credential_id" in message
         for message in result.messages
     )
+
+
+def test_console_payload_validation_public_github_clone_requires_only_url_and_branch():
+    result = validate_console_payload(
+        console_payload(
+            source_input_mode="clone",
+            source_repo_url="https://github.com/fastapi/full-stack-fastapi-template.git",
+            source_branch="main",
+            source_credential_id="",
+            source_access_token_env="",
+        )
+    )
+
+    assert result.ok
+    assert result.config is not None
+    assert result.config.source_repo_url == "https://github.com/fastapi/full-stack-fastapi-template.git"
+    assert result.config.source_branch == "main"
+    assert result.config.source_credential_id == "public-source"
+    assert result.config.source_access_token_env is None
+
+
+def test_console_payload_validation_allows_first_test_without_gitops_target():
+    result = validate_console_payload(
+        console_payload(
+            gitops_repo_url="",
+            gitops_branch="",
+            gitops_path="",
+            gitops_credential_id="",
+            registry_url="",
+            registry_project="",
+            registry_credential_id="",
+            registry_ca_cert_credential_id="",
+        )
+    )
+
+    assert result.ok
+    assert result.config is not None
+    assert result.messages == ()
+    assert result.config.gitops_repo_url == "https://gitops.example.local/review-only.git"
+    assert result.config.gitops_branch == "main"
+    assert result.config.gitops_path == "apps/fastapi-demo"
+    assert result.config.gitops_credential_id == "review-only-gitops-credential"
 
 
 def test_console_payload_validation_local_mode_uses_path_without_clone_fields(tmp_path):
@@ -454,6 +499,38 @@ def test_console_dry_run_local_mode_generates_assets_from_valid_repo_path(tmp_pa
     assert (output_dir / "Jenkinsfile").is_file()
     assert (output_dir / "gitops/apps/backend/deployment.yaml").is_file()
     assert (output_dir / "gitops/apps/frontend/deployment.yaml").is_file()
+
+
+def test_console_dry_run_local_mode_allows_first_test_without_gitops_target(tmp_path):
+    repo = write_sample_repo(tmp_path)
+
+    result = run_console_dry_run(
+        console_payload(
+            source_input_mode="local",
+            local_source_repo_path=repo.as_posix(),
+            source_repo_url="",
+            source_branch="",
+            source_credential_id="",
+            source_access_token_env="",
+            gitops_repo_url="",
+            gitops_branch="",
+            gitops_path="",
+            gitops_credential_id="",
+            registry_url="",
+            registry_project="",
+            registry_credential_id="",
+            registry_ca_cert_credential_id="",
+        )
+    )
+
+    assert result.ok
+    assert result.config is not None
+    assert result.config.gitops_path == "apps/fastapi-demo"
+    assert result.output_dir is not None
+    output_dir = Path(result.output_dir)
+    assert (output_dir / "Jenkinsfile").is_file()
+    assert (output_dir / "gitops/fleet.yaml").is_file()
+    assert (output_dir / "gitops/apps/backend/deployment.yaml").is_file()
 
 
 def test_console_dry_run_local_mode_blocks_invalid_repo_paths(tmp_path):

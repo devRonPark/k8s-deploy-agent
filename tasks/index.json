@@ -295,7 +295,7 @@
       "depends": [
         "6.1"
       ],
-      "status": "todo",
+      "status": "done",
       "gh": "-",
       "section": "Week 6 - Operator Console UX"
     }

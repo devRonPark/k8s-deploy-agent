@@ -76,7 +76,7 @@
 | Task | 내용 | DoD | Acceptance | Depends | Status | GH |
 |------|------|-----|------------|---------|--------|----|
 | 6.1 | operator console 단계형 UI/UX 개편 | web console이 입력, 검증, dry-run, 분석/산출물 리뷰, checklist를 단계형 workflow로 보여주고 generated asset preview를 기능별로 묶는다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 5.1 | cc:완료 | - |
-| 6.2 | web console public GitHub sample clone preset 추가 | web console에 `https://github.com/fastapi/full-stack-fastapi-template.git`와 `main` branch를 입력하는 sample 버튼이 있고, clone mode public GitHub repository validation은 source repo URL과 branch만으로 통과한다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 6.1 | cc:TODO | - |
+| 6.2 | web console public GitHub sample clone preset 추가 | web console에 `https://github.com/fastapi/full-stack-fastapi-template.git`와 `main` branch를 입력하는 sample 버튼이 있고, clone mode public GitHub repository validation은 source repo URL과 branch만으로 통과한다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 6.1 | cc:완료 | - |
 
 ---
 
