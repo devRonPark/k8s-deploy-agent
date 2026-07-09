@@ -56,17 +56,28 @@ k8s-deploy-agent dry-run --config <config.yaml> --output <dir>
 
 ### Required Inputs
 
-UI는 다음 값을 수집한다.
+UI는 초기 분석 테스트와 실제 GitOps/write-back 준비를 구분해 값을 수집한다.
+
+초기 분석 테스트는 다음 값만으로 실행 가능해야 한다.
 
 | Field | Rule |
 |-------|------|
 | application name | non-empty string |
 | environment | operator-defined label |
 | target namespace | Kubernetes namespace-compatible value |
-| source repository URL | internal repository URL |
-| source branch | branch or ref |
-| source credential ID | raw secret 금지 |
+| source repository URL 또는 local source repository path | internal repository URL or server local path |
+| source branch | branch or ref; local mode는 `local` placeholder 사용 |
+| source credential ID | private source repository일 때 raw secret이 아닌 credential ID. clone 모드에서 비워두면 anonymous clone을 기본 동작으로 시도한다 |
 | source access token env | optional environment variable name only |
+
+GitOps target을 비워 둔 초기 분석 테스트는 review-only placeholder GitOps config를 사용해 local dry-run artifact만 생성한다. 이 placeholder는 generated Jenkinsfile과 manifest preview를 만들기 위한 값이며 source/GitOps repository에 push하지 않는다.
+
+Source credential ID가 비어 있는 clone 모드는 특정 URL에 대한 예외 처리가 아니라 일반 규칙으로 anonymous clone을 시도한다. 대상 repository가 실제로 public이면 검증 -> dry-run이 정상 완료되고, 실제로는 private repository인데 credential이 없으면 dry-run 단계에서 git 인증 실패로 명확히 실패하며 "private repository면 source credential ID를 입력하세요" 안내 문구를 함께 보여준다.
+
+GitOps/write-back 준비 단계는 다음 값을 추가로 요구한다.
+
+| Field | Rule |
+|-------|------|
 | GitOps repository URL | internal GitOps repository URL |
 | GitOps branch/path | target branch and path |
 | GitOps credential ID | raw secret 금지 |
@@ -107,6 +118,8 @@ MVP console은 dry-run 결과에서 다음을 보여준다.
 | R10 | dry-run output remains deterministic for the same config and source tree | Must | repeated run produces the same generated file content except explicit image tag/input changes |
 | R11 | Dockerfile proposal은 source repository에 write-back하지 않는다 | Must | proposal files are generated only under `dockerfile-proposals/` |
 | R12 | root-level app repository도 service candidate로 감지한다 | Must | root dependency file creates a BuildProfile and eligible proposal artifact |
+| R13 | operator console은 작업 대상과 Source repository 입력만으로 초기 분석 테스트를 실행한다 | Must | GitOps target 입력이 모두 비어 있어도 validation과 local dry-run이 review-only placeholder GitOps config로 통과한다 |
+| R14 | clone 모드에서 source_credential_id가 비어 있으면 특정 URL 예외 없이 anonymous clone을 기본 동작으로 시도한다 | Must | 임의의 public repository URL(하드코딩된 데모 URL이 아니어도)과 branch만 입력하면 validation과 dry-run이 통과한다. 대상이 실제 private repository면 dry-run이 git 인증 실패 메시지와 함께 "private repository면 source credential ID를 입력하세요" 안내 문구를 보여주며 명확히 실패한다 |
 
 ## Safety Rules
 
@@ -126,6 +139,10 @@ MVP console은 dry-run 결과에서 다음을 보여준다.
 | 2026-07-06 | LLM은 optional on-prem adapter로만 연결한다 | 외부 SaaS 의존 없이 core generation을 보장한다 |
 | 2026-07-06 | UI는 credential ID/env var name만 받는다 | raw secret leakage risk를 줄인다 |
 | 2026-07-06 | Dockerfile은 review-only proposal artifact로만 생성한다 | 자동 source write-back 없이 사람이 검토할 수 있는 migration 준비물을 만든다 |
+| 2026-07-09 | operator console 초기 분석 테스트는 GitOps target 없이 실행 가능하게 한다 | 작업 대상과 Source repository만 확보된 상태에서 1차 repository 분석과 generated asset preview를 확인할 수 있어야 한다 |
+| 2026-07-09 | clone 모드에서 source_credential_id가 비어 있으면 특정 하드코딩 URL이 아니라 일반 규칙으로 anonymous clone을 시도한다 | 기존에는 `_is_public_sample_clone`이 FastAPI 데모 URL/branch 조합에만 credential 없이 통과시켰고, 다른 public repository URL은 동일한 상황에서도 `Missing required config fields: source_credential_id`로 거부되는 버그가 있었다. GitOps target에 이미 적용된 placeholder 기본값 패턴과 일관되게 맞춘다 |
+| 2026-07-09 | 하드코딩된 FastAPI 데모 URL 전용 예외 함수(`_is_public_sample_clone`)는 제거하고 일반 anonymous clone 판정(`_is_anonymous_clone`)으로 통합한다. `PUBLIC_SAMPLE_REPO_URL`/`PUBLIC_SAMPLE_BRANCH` 상수는 sample 값 채우기 버튼에서 계속 쓰이므로 유지한다 | 특정 URL만 예외로 인정하는 검증 로직은 유지보수 부채이며, 사용자가 다른 public repository를 입력할 때마다 같은 버그를 재현시킨다. sample 버튼은 검증 로직과 무관한 별개 UI 편의 기능이라 남겨둔다 |
+| 2026-07-09 | anonymous clone이 git 인증 실패로 끝나면 dry-run 에러 메시지에 "private repository면 source credential ID를 입력하세요" 안내 문구를 추가한다 | sanitized git stderr만으로는 실패 원인이 credential 누락인지 파악하기 어려워 operator가 헤맬 수 있다 |
 
 ## Open Questions
 
