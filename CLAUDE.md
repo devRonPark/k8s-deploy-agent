@@ -12,6 +12,7 @@ Claude Code 기준 rulebook이다. Codex는 `AGENTS.md`와 `.agents/skills/*`로
 - 배포 대상: customer on-premise or air-gapped environments
 - 응답 언어: 한국어. 코드, 명령어, 고유명사는 그대로 둔다.
 - 코딩 규칙: Python standard library 우선, deterministic dry-run, raw secret value 금지, generated asset write-back은 explicit validation gate 뒤에서만 허용.
+- local `web` 시작은 기본적으로 `127.0.0.1:8080`을 사용한다. 사용자가 다른 포트를 요구하지 않으면 변경하지 않는다.
 
 ## 핵심 파일
 
