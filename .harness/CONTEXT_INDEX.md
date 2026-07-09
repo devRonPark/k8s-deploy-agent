@@ -16,6 +16,7 @@ Use this index to avoid rereading unrelated files.
 | `.harness/LESSONS.md` | Reusable prevention rules |
 | `.harness/RUN_REPORT.md` | Root run-report template for task-specific evidence |
 | `.harness/events/planning.jsonl` | Planning proposal event log |
+| `.harness/shared/planning/` | Planning context runs, proposed task files, and decomposition reports |
 | `.harness/tasks/` | Task-specific live context directories |
 | `agents/task-decomposer.md` | Task splitting and planning gate |
 | `agents/test-agent.md` | Acceptance and test verification gate |

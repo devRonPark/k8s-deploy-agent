@@ -1,0 +1,16 @@
+{
+  "tasks": [
+    {
+      "id": "6.2",
+      "title": "web console public GitHub sample clone preset 추가",
+      "dod": "web console에 `https://github.com/fastapi/full-stack-fastapi-template.git`와 `main` branch를 입력하는 sample 버튼이 있고, clone mode public GitHub repository validation은 source repo URL과 branch만으로 통과한다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "6.1"
+      ],
+      "status": "todo",
+      "gh": "-",
+      "section": "Week 6 - Operator Console UX"
+    }
+  ]
+}
