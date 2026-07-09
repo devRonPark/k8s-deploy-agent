@@ -13,6 +13,8 @@ from k8s_deploy_agent.dockerfile_proposal import render_dockerfile_proposals, re
 from k8s_deploy_agent.dockerfile_validation import render_dockerfile_proposal_validation
 from k8s_deploy_agent.gitops import render_gitops_manifests
 from k8s_deploy_agent.jenkinsfile import render_jenkinsfile
+from k8s_deploy_agent.manifest_plan import build_workload_manifest_plans
+from k8s_deploy_agent.manual_actions import render_manual_actions
 from k8s_deploy_agent.redaction import assert_no_secret_values
 from k8s_deploy_agent.report import render_repository_analysis
 from k8s_deploy_agent.source_repo import clone_source_repository
@@ -20,6 +22,7 @@ from k8s_deploy_agent.ui import render_dry_run_dashboard
 from k8s_deploy_agent.web import run_web_server
 
 REPORT_PATH = ".agent/reports/repository-analysis.md"
+MANUAL_ACTIONS_PATH = ".agent/reports/manual-actions.md"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -85,8 +88,10 @@ def _write_generated_assets(
     output_dir: str,
     image_tag: str,
 ) -> list[str]:
+    manifest_plan = build_workload_manifest_plans(config, analysis, image_tag)
     generated = {
         REPORT_PATH: render_repository_analysis(analysis),
+        MANUAL_ACTIONS_PATH: render_manual_actions(manifest_plan, image_tag),
         "Jenkinsfile": render_jenkinsfile(config, analysis),
     }
     manifests = render_gitops_manifests(config, analysis, image_tag=image_tag)

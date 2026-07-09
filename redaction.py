@@ -14,6 +14,23 @@ SECRET_ASSIGNMENT_RE = re.compile(
 SECRET_VALUE_RE = re.compile(
     r"(github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,})"
 )
+PUBLIC_CONFIG_PREFIXES = ("NEXT_PUBLIC_", "VITE_", "PUBLIC_")
+SECRET_KEY_MARKERS = (
+    "TOKEN",
+    "PASSWORD",
+    "SECRET",
+    "API_KEY",
+    "PRIVATE_KEY",
+    "ENCRYPTION_KEY",
+    "AUTH_SECRET",
+    "DATABASE_URL",
+    "DATABASE_DIRECT_URL",
+    "DSN",
+    "CONNECTION_STRING",
+    "WEBHOOK_SECRET",
+    "CLIENT_SECRET",
+    "ACCESS_KEY",
+)
 
 
 @dataclass(frozen=True)
@@ -34,10 +51,10 @@ def find_secret_leaks(files: Mapping[str, str]) -> list[SecretLeak]:
             if not match:
                 continue
             key = match.group("key")
-            normalized_key = key.lower().replace("-", "_")
-            if normalized_key.endswith("credential_id"):
+            normalized_key = key.replace("-", "_")
+            if normalized_key.lower().endswith("credential_id"):
                 continue
-            if not _is_secret_key(normalized_key):
+            if not is_secret_key(normalized_key):
                 continue
             leaks.append(SecretLeak(path=path, line_number=line_number, key=key))
     return leaks
@@ -52,5 +69,17 @@ def assert_no_secret_values(files: Mapping[str, str]) -> None:
     raise ValueError(f"Secret value detected: {details}")
 
 
+def is_public_config_key(key: str) -> bool:
+    normalized = key.upper().replace("-", "_")
+    return normalized.startswith(PUBLIC_CONFIG_PREFIXES)
+
+
+def is_secret_key(key: str) -> bool:
+    normalized = key.upper().replace("-", "_")
+    if is_public_config_key(normalized):
+        return False
+    return any(marker in normalized for marker in SECRET_KEY_MARKERS)
+
+
 def _is_secret_key(key: str) -> bool:
-    return any(marker in key for marker in ("token", "password", "secret", "api_key"))
+    return is_secret_key(key)

@@ -36,7 +36,10 @@ def clone_source_repository(config: DemoConfig, work_dir: str | Path) -> Path:
     result = subprocess.run(command, check=False, capture_output=True, text=True, env=env)
     if result.returncode != 0:
         detail = _sanitize_error(result.stderr or result.stdout)
-        raise ValueError(f"Failed to clone source repository: {detail}")
+        message = f"Failed to clone source repository: {detail}"
+        if askpass is None:
+            message += " private repository면 source credential ID를 입력하세요."
+        raise ValueError(message)
     return destination
 
 

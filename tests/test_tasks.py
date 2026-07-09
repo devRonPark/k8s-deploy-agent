@@ -98,5 +98,64 @@ class SyncPlansTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
 
 
+class ShowTaskTest(unittest.TestCase):
+    def _write_root(self, tmp: str, tasks: list) -> Path:
+        root = Path(tmp)
+        (root / "tasks").mkdir()
+        (root / "scripts").symlink_to(ROOT / "scripts", target_is_directory=True)
+        (root / "tasks" / "index.json").write_text(
+            json.dumps({"tasks": [t.to_dict() for t in tasks]}), encoding="utf-8"
+        )
+        return root
+
+    def test_prints_task_fields_and_depends_status_without_reading_whole_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._write_root(
+                tmp,
+                [
+                    task(id="8.2", status="done"),
+                    task(id="8.3", status="done"),
+                    task(
+                        id="8.4",
+                        title="WorkloadManifestPlan builder",
+                        dod="combines evidence",
+                        acceptance="pytest -k workload",
+                        depends=["8.2", "8.3"],
+                        status="todo",
+                        section="Week 8",
+                    ),
+                ],
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "scripts" / "show_task.py"), "--root", str(root), "8.4"],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("id: 8.4", result.stdout)
+            self.assertIn("status: todo", result.stdout)
+            self.assertIn("dod: combines evidence", result.stdout)
+            self.assertIn("acceptance: pytest -k workload", result.stdout)
+            self.assertIn("8.2: done", result.stdout)
+            self.assertIn("8.3: done", result.stdout)
+
+    def test_missing_task_id_exits_nonzero(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._write_root(tmp, [task(id="1.1")])
+
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "scripts" / "show_task.py"), "--root", str(root), "9.9"],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("not found", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

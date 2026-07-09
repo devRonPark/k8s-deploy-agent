@@ -1,0 +1,112 @@
+# Harness Log
+
+Append meaningful work and errors here. Keep task status in `Plans.md`.
+
+## 2026-07-06
+
+- Started Codex CLI harness setup for `k8s-deploy-agent`.
+- Inspected `/tmp/cc-harness-template`.
+- Chose not to copy Claude-specific `.claude/` runtime files as active config.
+- Added `AGENTS.md`, `harness.toml`, `Plans.md`, `.harness/`, `agents/`, `docs/templates/`, and GitHub workflow/template files.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 3 passed.
+- Verified bootstrap Acceptance commands for `AGENTS.md`, `harness.toml`, `Plans.md`, `.harness/STATE.md`, and `.github/workflows/ci.yml`.
+- Implemented Week 1 operator console planning docs: `docs/PRD.md`, `docs/UserFlow.md`, and `docs/Architecture.md`.
+- Updated `Plans.md` tasks 1.1 and 1.2 to `cc:완료` after document Acceptance checks passed.
+- Updated `.harness/CONTEXT_INDEX.md` with the new durable operator console docs.
+- Verified with `test -f docs/PRD.md`, `test -f docs/UserFlow.md`, `test -f docs/Architecture.md`, and `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 3 passed.
+- Split Phase 2 operator console work into tasks 2.1 through 2.4 in `Plans.md`.
+- Implemented task 2.1: added `k8s-deploy-agent web --host 127.0.0.1 --port 8080`, local HTTP serving, and the first offline operator console shell in `web.py`.
+- Added tests for `web` command dispatch and offline/secret-safe console HTML.
+- Documented the new `web` command in `README.md`.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 5 passed.
+- Started the local operator console at `http://127.0.0.1:8080/` and verified the HTML response with `curl -s http://127.0.0.1:8080/`.
+- Implemented task 2.2: added `DemoConfig`-compatible form payload validation to the operator console, including raw secret-like rejection and environment variable name checks for `source_access_token_env`.
+- Updated the console to accept POSTed form data at `/validate` and to render validation results inline.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 7 passed.
+- Verified the live validation path with `curl -s -X POST http://127.0.0.1:8080/validate` against the running local console.
+- Implemented task 2.3: added `POST /dry-run` to reuse the existing dry-run pipeline from the web console and write assets to a local output directory.
+- Added `ConsoleDryRunResult` rendering to show output directory and generated file list in the console.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 8 passed.
+- Verified the live dry-run path with a local git repository and `curl -s -X POST http://127.0.0.1:8080/dry-run`.
+- Implemented task 2.4: added generated asset preview snippets and a blocking validation checklist derived from the dry-run output directory.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 9 passed.
+- Verified the live preview/checklist path with `curl -s -X POST http://127.0.0.1:8080/dry-run` against a local repository.
+- Added `docs/monthly-demo.md` as a team meeting runbook for the current operator console demo scope.
+- Linked the monthly demo runbook from `README.md` and indexed it in `.harness/CONTEXT_INDEX.md`.
+- Added Week 3 planning task `3.1` to `Plans.md` for Dockerfile auto-generation scope definition.
+- Marked Dockerfile auto-generation as outside the current monthly demo scope in `docs/monthly-demo.md`.
+- Added `docs/DockerfilePlan.md` to capture Dockerfile writing practices, common language patterns, deterministic build profile requirements, and proposal gates before implementation.
+- Updated `docs/Architecture.md` to require `repository analyzer -> normalized build profile -> human review -> Dockerfile proposal preview` before Dockerfile generation.
+- Updated `.harness/CONTEXT_INDEX.md` with `docs/DockerfilePlan.md`.
+- Verified `test -f docs/DockerfilePlan.md` and `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 9 passed.
+- Split Dockerfile generation work into executable tasks 3.2 through 3.12 in `Plans.md`, covering BuildProfile modeling, analyzer evidence, confidence gates, reports/UI, language-specific proposal previews, `.dockerignore`, and validation.
+- Created branch `feature/dockerfile-build-profile` for Dockerfile implementation work.
+- Implemented tasks 3.2 through 3.4: added `BuildProfile`/`ProfileEvidence`, analyzer profile generation for Python/Node/Java/Go service candidates, build tool evidence, runtime command candidates, and port evidence.
+- Added `tests/test_build_profile.py` for deterministic BuildProfile behavior.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 11 passed.
+- Implemented task 3.5: added Dockerfile proposal gating so low-confidence or unresolved BuildProfiles are excluded from proposal generation.
+- Implemented task 3.6: added BuildProfile and evidence sections to the repository analysis report for dry-run/operator review.
+- Implemented task 3.7: added review-only Python Dockerfile proposal rendering and connected it to dry-run output under `dockerfile-proposals/<service>/Dockerfile`.
+- Adjusted analyzer confidence to mark complete dependency/build/runtime/port profiles as `confirmed`.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 14 passed.
+- Implemented tasks 3.8 through 3.10: added review-only Dockerfile proposal rendering for confirmed Node.js, Java, and Go BuildProfiles.
+- Implemented task 3.11: added BuildProfile-based `.dockerignore` proposal artifacts under `dockerfile-proposals/<service>/.dockerignore`.
+- Implemented task 3.12: added `dockerfile-proposals/VALIDATION.md` for secret redaction, confidence gate, and review-only output checks; surfaced it in the operator console preview/checklist.
+- Extended analyzer BuildProfiles with build command and build output evidence for Node.js, Java, and Go services.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 15 passed.
+- Updated `README.md`, `docs/DockerfilePlan.md`, and `docs/monthly-demo.md` to document the implemented review-only Dockerfile proposal scope and keep automatic write-back/build execution out of scope.
+- Confirmed `Plans.md` has no remaining active Dockerfile proposal tasks.
+- Localized the dry-run static dashboard in `ui.py` from English operator labels to Korean while preserving technical terms such as `Dockerfile`, `Image`, `GitOps`, and `Image tag`.
+- Updated dry-run dashboard test expectations in `tests/test_cli_dry_run.py`.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 15 passed.
+- Validated `dry-run` against GitHub OSS repositories under `/tmp/k8s-deploy-agent-gh-check`: `pallets/flask`, `expressjs/express`, `spring-projects/spring-petclinic`, `gin-gonic/examples`, plus representative multi-service repos `dockersamples/example-voting-app` and `GoogleCloudPlatform/microservices-demo`.
+- Found a current analyzer limitation: source repos whose app manifest is at repository root are not detected because service discovery only scans immediate child directories.
+- Confirmed multi-service directory layouts generate review artifacts: `example-voting-app` produced Fleet/Kubernetes assets for `result` and `vote`; `microservices-demo/src` produced 37 files including GitOps manifests and Dockerfile proposals for confirmed Java/Go services.
+- Verified after OSS validation with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 15 passed.
+- Split repository-shape coverage into task 4.1 and implemented root-level app repository detection in `analyzer.py`.
+- Added tests for root-level service discovery, BuildProfile generation, and dry-run asset generation with `.` Docker context.
+- Re-ran OSS root-app validation for `pallets/flask`, `expressjs/express`, and `spring-projects/spring-petclinic`; each now appears as a root-level service candidate while deploy/proposal gates still block missing Dockerfile, runtime, or port evidence.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 17 passed.
+- Re-tested after root-level analyzer changes: `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q` passed with 17 tests, and dry-run succeeded against `pallets/flask`, `expressjs/express`, `spring-projects/spring-petclinic`, `gin-gonic/examples`, `dockersamples/example-voting-app`, and `GoogleCloudPlatform/microservices-demo/src`.
+- Updated docs under `docs/` for the current `feature/dockerfile-build-profile` branch: operator console docs now describe implemented local console behavior, BuildProfile evidence, root-level app detection, review-only Dockerfile/`.dockerignore` proposals, and `dockerfile-proposals/VALIDATION.md`.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 17 passed.
+- Added `docs/AgentWorkflowOverview.md` as a manager-facing current workflow overview for source repository analysis through Kubernetes dry-run asset generation, validation, and operator review.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 17 passed.
+
+## 2026-07-08
+
+- Implemented task 5.1: added `clone`/`local` source input mode selection to the local web operator console.
+- Added local source repository path validation with `Path.expanduser().resolve()`, directory checks, invalid mode blocking, and dry-run error blocking for `ValueError`/`OSError`/`PermissionError`.
+- Preserved submitted source mode and local path in the web form after validation or dry-run.
+- Documented source input mode behavior in `docs/UserFlow.md` and `docs/Architecture.md`, including local mode output-only behavior.
+- Added tests for source mode controls, default clone behavior, valid local repo dry-run generation, invalid local paths, invalid mode blocking, clone mode ignoring local path, and form value retention.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 22 passed.
+- Localized the web operator console in `web.py` to Korean for user-facing form labels, section titles, buttons, workflow copy, validation/dry-run messages, checklist text, and local path validation errors while preserving technical identifiers, form field names, and mode values.
+- Updated web console tests in `tests/test_cli_dry_run.py` to assert the Korean UI text and localized validation errors while retaining checks for offline-first and secret-safe HTML.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 22 passed.
+- Tightened task 5.1 validation: `local` source input mode now validates only `local_source_repo_path` for source selection, normalizes it into dry-run compatible internal source placeholders, and still redaction-checks the raw submitted form values.
+- Added tests for duplicate form input names, clone-only required source fields, local mode with empty clone fields, invalid local paths, clone mode ignoring local path, and local-mode secret-like rejection.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_cli_dry_run.py -q`: 20 passed.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 27 passed.
+- Implemented task 6.1: refreshed the local web operator console into a step-based workflow covering input, validation, dry-run, analysis/asset review, and checklist.
+- Grouped the console form into 작업 대상, Source repository, GitOps target, and Private registry sections without changing submitted field names or endpoints.
+- Added a run summary strip and grouped generated asset preview sections for repository analysis, CI pipeline, GitOps base, service manifests, and Dockerfile proposals.
+- Kept On-prem LLM review and write-back preparation as inactive future panels; no LLM endpoint, push, commit, or source/GitOps write-back behavior was added.
+- Updated UI regression tests for the step workflow, grouped inputs, grouped preview, offline-first HTML, and duplicate input-name guard.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_cli_dry_run.py -q`: 20 passed.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 27 passed.
+- Adjusted the web console Source repository form so `clone` mode shows only Source repository URL, Source branch, Source credential ID, and Source access token env, while `local` mode shows only local source repository path.
+- Updated local-mode validation to ignore hidden clone-only source fields so stale URL/branch/credential/env values do not block local path analysis.
+- Added UI and validation regression tests for source-mode-specific field visibility and hidden clone field handling.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 28 passed.
+
+## 2026-07-09
+
+- Applied `devRonPark/cc-harness-template` v4 structure to this repository without changing application runtime code.
+- Added JSON-backed task state in `tasks/index.json` by migrating the existing `Plans.md` task table.
+- Added task management scripts under `scripts/`, Codex repo-scoped skills under `.agents/skills/`, Claude command/memory scaffolding under `.claude/`, and shared quality gate documentation.
+- Updated `AGENTS.md`, added `CLAUDE.md` and `BLUEPRINT.md`, and expanded `harness.toml` for planning proposal settings while preserving uv pytest verification and on-premise safety rules.
+- Replaced `plans-guard.yml` with `tasks/index.json` validation and `Plans.md` sync checks; kept the project-specific Python CI workflow.
+- Verified with `python3 scripts/validate_tasks.py`: 24 tasks valid.
+- Verified with `python3 scripts/sync_plans.py --check`: `Plans.md` in sync.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 46 passed.

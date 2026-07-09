@@ -1,0 +1,253 @@
+{
+  "run_id": "plan-20260709-172630-6217e9",
+  "created_at": "2026-07-09T17:26:30+09:00",
+  "request": "Week 8 - Evidence-based GitOps Manifest Planning 파이프라인(8.1~8.7)이 실제 fastapi/full-stack-fastapi-template 레포 구조를 기준으로 정확히 동작하는지 검증하는 통합 테스트 Task를 추가한다.\n\n배경: 이전 세션에서 web dry-run 산출물을 fastapi-template로 실측 검증한 리뷰를 했고, 그 사이 다른 세션이 Week 8(8.1 monorepo discovery, 8.2 evidence 기반 port analyzer, 8.3 env/dependency analyzer - 이상 done, 8.4 WorkloadManifestPlan builder, 8.5 gitops renderer 전환, 8.6 manual-actions.md, 8.7 dashboard readiness - 이상 todo)를 이미 계획/구현했다. 사용자는 이 파이프라인이 실제 샘플 레포 기준으로 pass 못하면 로직을 재조정하는 검증 단계를 포함시키길 원한다.\n\n실측 근거: backend Dockerfile은 EXPOSE 없이 CMD [\"fastapi\",\"run\",\"--workers\",\"4\"]만 있어 --port 플래그가 없으므로 8.2 설계(추측 금지, 근거 기반만 confirmed) 하에서는 backend 포트가 unresolved로 남아야 한다. frontend/nginx.conf에는 실제로 \"listen 80;\"이 있어 8.2의 nginx_listen 소스로 confirmed되어야 한다. backend/app/core/config.py의 pydantic Settings 클래스에는 SECRET_KEY, POSTGRES_PASSWORD, FIRST_SUPERUSER_PASSWORD 같은 secret과 POSTGRES_SERVER, PROJECT_NAME 같은 public config가 섞여 있다. compose.yml에는 image: postgres:18 서비스가 있어 postgres dependency로 감지돼야 한다.\n\n오프라인/폐쇄망 운영 원칙(CLAUDE.md) 때문에 테스트는 매번 GitHub에서 clone하지 않고, 레포의 핵심 파일 구조를 tests/fixtures/에 고정 스냅샷으로 박제해서 검증한다. 8.7(파이프라인 전체 완성) 이후 실행되는 통합 검증 Task 하나로 추가한다.",
+  "documents": [
+    {
+      "label": "PRD",
+      "path": "docs/PRD.md",
+      "exists": true
+    },
+    {
+      "label": "User Flow",
+      "path": "docs/UserFlow.md",
+      "exists": true
+    },
+    {
+      "label": "Design",
+      "path": "docs/DESIGN.md",
+      "exists": false
+    },
+    {
+      "label": "Architecture",
+      "path": "docs/Architecture.md",
+      "exists": true
+    }
+  ],
+  "existing_tasks": [
+    {
+      "id": "0.1",
+      "title": "Codex harness 기본 파일 추가",
+      "status": "done",
+      "section": "Week 0 - Harness Bootstrap"
+    },
+    {
+      "id": "0.2",
+      "title": "Python CLI 검증 명령 고정",
+      "status": "done",
+      "section": "Week 0 - Harness Bootstrap"
+    },
+    {
+      "id": "0.3",
+      "title": "GitHub Actions CI 추가",
+      "status": "done",
+      "section": "Week 0 - Harness Bootstrap"
+    },
+    {
+      "id": "1.1",
+      "title": "Local operator console PRD 작성",
+      "status": "done",
+      "section": "Week 1 - Operator Console Planning"
+    },
+    {
+      "id": "1.2",
+      "title": "UI flow와 architecture 작성",
+      "status": "done",
+      "section": "Week 1 - Operator Console Planning"
+    },
+    {
+      "id": "2.1",
+      "title": "`web` command 기본 local console shell 추가",
+      "status": "done",
+      "section": "Week 2 - Local Operator Console"
+    },
+    {
+      "id": "2.2",
+      "title": "operator console config form payload 검증 추가",
+      "status": "done",
+      "section": "Week 2 - Local Operator Console"
+    },
+    {
+      "id": "2.3",
+      "title": "operator console dry-run 실행 연결",
+      "status": "done",
+      "section": "Week 2 - Local Operator Console"
+    },
+    {
+      "id": "2.4",
+      "title": "generated asset preview와 validation checklist 추가",
+      "status": "done",
+      "section": "Week 2 - Local Operator Console"
+    },
+    {
+      "id": "3.1",
+      "title": "Dockerfile 자동 생성 범위 정의",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.2",
+      "title": "BuildProfile 데이터 모델 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.3",
+      "title": "repository analyzer BuildProfile 생성",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.4",
+      "title": "runtime command와 port evidence 분석",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.5",
+      "title": "Dockerfile proposal gate 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.6",
+      "title": "BuildProfile 리포트 출력 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.7",
+      "title": "Python Dockerfile proposal preview 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.8",
+      "title": "Node.js Dockerfile proposal preview 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.9",
+      "title": "Java Dockerfile proposal preview 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.10",
+      "title": "Go Dockerfile proposal preview 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.11",
+      "title": "`.dockerignore` proposal preview 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.12",
+      "title": "Dockerfile proposal validation checklist 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "4.1",
+      "title": "root-level app repository 감지 추가",
+      "status": "done",
+      "section": "Week 4 - Repository Shape Coverage"
+    },
+    {
+      "id": "5.1",
+      "title": "web form에서 local repo path 분석 지원",
+      "status": "done",
+      "section": "Week 5 - Web Local Source Input"
+    },
+    {
+      "id": "6.1",
+      "title": "operator console 단계형 UI/UX 개편",
+      "status": "done",
+      "section": "Week 6 - Operator Console UX"
+    },
+    {
+      "id": "6.2",
+      "title": "web console public GitHub sample clone preset 추가",
+      "status": "done",
+      "section": "Week 6 - Operator Console UX"
+    },
+    {
+      "id": "7.1",
+      "title": "clone 모드에서 source_credential_id 없이 anonymous clone 허용",
+      "status": "done",
+      "section": "Week 7 - Anonymous Source Clone Fix"
+    },
+    {
+      "id": "7.2",
+      "title": "anonymous clone 인증 실패 시 안내 문구 추가",
+      "status": "done",
+      "section": "Week 7 - Anonymous Source Clone Fix"
+    },
+    {
+      "id": "8.1",
+      "title": "monorepo workspace service discovery 개선",
+      "status": "done",
+      "section": "Week 8 - Evidence-based GitOps Manifest Planning"
+    },
+    {
+      "id": "8.2",
+      "title": "evidence 기반 port analyzer 추가",
+      "status": "done",
+      "section": "Week 8 - Evidence-based GitOps Manifest Planning"
+    },
+    {
+      "id": "8.3",
+      "title": "env var와 dependency analyzer 추가",
+      "status": "done",
+      "section": "Week 8 - Evidence-based GitOps Manifest Planning"
+    },
+    {
+      "id": "8.4",
+      "title": "WorkloadManifestPlan builder 추가",
+      "status": "todo",
+      "section": "Week 8 - Evidence-based GitOps Manifest Planning"
+    },
+    {
+      "id": "8.5",
+      "title": "GitOps renderer를 WorkloadManifestPlan 기반으로 전환",
+      "status": "todo",
+      "section": "Week 8 - Evidence-based GitOps Manifest Planning"
+    },
+    {
+      "id": "8.6",
+      "title": "dry-run manual-actions.md report 추가",
+      "status": "todo",
+      "section": "Week 8 - Evidence-based GitOps Manifest Planning"
+    },
+    {
+      "id": "8.7",
+      "title": "report와 dashboard를 manifest plan readiness로 전환",
+      "status": "todo",
+      "section": "Week 8 - Evidence-based GitOps Manifest Planning"
+    },
+    {
+      "id": "8.8",
+      "title": "README dry-run manifest analysis 원칙 업데이트",
+      "status": "todo",
+      "section": "Week 8 - Evidence-based GitOps Manifest Planning"
+    }
+  ],
+  "rules": {
+    "task_decomposer": "agents/task-decomposer.md",
+    "task_state_source": "tasks/index.json",
+    "readable_plan": "Plans.md"
+  },
+  "outputs": {
+    "run_dir": ".harness/shared/planning/runs/plan-20260709-172630-6217e9",
+    "proposal": ".harness/shared/planning/runs/plan-20260709-172630-6217e9/proposed-tasks.json",
+    "report": ".harness/shared/planning/runs/plan-20260709-172630-6217e9/decomposition-report.md"
+  },
+  "technical": {
+    "schema_version": 1,
+    "proposal_dir": ".harness/shared/planning"
+  }
+}

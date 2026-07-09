@@ -8,6 +8,23 @@ from pathlib import Path
 from k8s_deploy_agent.build_profile import BuildProfile, ProfileEvidence
 
 
+COMMON_SERVICE_DIRS = ("backend", "frontend", "api", "web", "server", "client")
+WORKSPACE_SERVICE_DIRS = ("apps", "services", "packages")
+IGNORED_DIRS = {
+    ".git",
+    ".gradle",
+    ".next",
+    ".pytest_cache",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "node_modules",
+    "target",
+    "venv",
+}
+
+
 @dataclass(frozen=True)
 class ServiceCandidate:
     name: str
@@ -23,6 +40,7 @@ class RepositoryAnalysis:
     file_tree: tuple[str, ...]
     services: tuple[ServiceCandidate, ...]
     build_profiles: tuple[BuildProfile, ...] = ()
+    workspace_markers: tuple[str, ...] = ()
 
     @property
     def service_names(self) -> list[str]:
@@ -40,7 +58,14 @@ def analyze_repository(root: str | Path) -> RepositoryAnalysis:
     file_tree = tuple(_collect_file_tree(root_path))
     services = tuple(_detect_services(root_path))
     build_profiles = tuple(_build_profile(root_path, service) for service in services)
-    return RepositoryAnalysis(root=root_path, file_tree=file_tree, services=services, build_profiles=build_profiles)
+    workspace_markers = tuple(_detect_workspace_markers(root_path))
+    return RepositoryAnalysis(
+        root=root_path,
+        file_tree=file_tree,
+        services=services,
+        build_profiles=build_profiles,
+        workspace_markers=workspace_markers,
+    )
 
 
 def _collect_file_tree(root: Path) -> list[str]:
@@ -54,34 +79,79 @@ def _collect_file_tree(root: Path) -> list[str]:
 
 def _detect_services(root: Path) -> list[ServiceCandidate]:
     services: list[ServiceCandidate] = []
-    for path in sorted(root.iterdir()):
-        if not path.is_dir() or path.name.startswith("."):
+    seen: set[Path] = set()
+
+    for path in _service_search_paths(root):
+        if path in seen or _is_ignored_path(path, root):
             continue
-        candidate = _service_from_directory(path)
+        seen.add(path)
+        candidate = _service_from_directory(path, root)
         if candidate:
             services.append(candidate)
     if services:
         return services
 
-    root_candidate = _service_from_directory(root)
+    root_candidate = _service_from_directory(root, root)
     if root_candidate:
         services.append(root_candidate)
     return services
 
 
-def _service_from_directory(path: Path) -> ServiceCandidate | None:
+def _service_search_paths(root: Path) -> list[Path]:
+    paths: list[Path] = []
+    for name in COMMON_SERVICE_DIRS:
+        path = root / name
+        if path.is_dir():
+            paths.append(path)
+
+    for path in sorted(root.iterdir()):
+        if path.is_dir() and not path.name.startswith("."):
+            paths.append(path)
+
+    for workspace_name in WORKSPACE_SERVICE_DIRS:
+        workspace = root / workspace_name
+        if not workspace.is_dir():
+            continue
+        for path in sorted(workspace.iterdir()):
+            if path.is_dir() and not path.name.startswith("."):
+                paths.append(path)
+    return paths
+
+
+def _detect_workspace_markers(root: Path) -> list[str]:
+    markers: list[str] = []
+    for name in ("pnpm-workspace.yaml", "turbo.json", "nx.json", "lerna.json"):
+        if (root / name).is_file():
+            markers.append(name)
+
+    package_json = _read_package_json(root / "package.json")
+    if "workspaces" in package_json:
+        markers.append("package.json workspaces")
+    return markers
+
+
+def _service_from_directory(path: Path, root: Path) -> ServiceCandidate | None:
     dockerfile = path / "Dockerfile"
     dockerfile_path = dockerfile if dockerfile.is_file() else None
+    reason_prefix = "workspace " if _is_workspace_service_path(path, root) else ""
 
     if (path / "package.json").is_file():
-        return ServiceCandidate(path.name, path, "node", "package.json", dockerfile_path)
+        return ServiceCandidate(path.name, path, "node", f"{reason_prefix}package.json", dockerfile_path)
     if (path / "pyproject.toml").is_file() or (path / "requirements.txt").is_file():
-        return ServiceCandidate(path.name, path, "python", "python dependency file", dockerfile_path)
+        return ServiceCandidate(path.name, path, "python", f"{reason_prefix}python dependency file", dockerfile_path)
     if (path / "pom.xml").is_file() or (path / "build.gradle").is_file():
-        return ServiceCandidate(path.name, path, "java", "java build file", dockerfile_path)
+        return ServiceCandidate(path.name, path, "java", f"{reason_prefix}java build file", dockerfile_path)
     if (path / "go.mod").is_file():
-        return ServiceCandidate(path.name, path, "unsupported", "unsupported Go module", dockerfile_path)
+        return ServiceCandidate(path.name, path, "unsupported", f"{reason_prefix}unsupported Go module", dockerfile_path)
     return None
+
+
+def _is_workspace_service_path(path: Path, root: Path) -> bool:
+    try:
+        relative_parts = path.relative_to(root).parts
+    except ValueError:
+        return False
+    return len(relative_parts) == 2 and relative_parts[0] in WORKSPACE_SERVICE_DIRS
 
 
 def _build_profile(root: Path, service: ServiceCandidate) -> BuildProfile:
@@ -410,6 +480,8 @@ def _port_from_text(text: str) -> int | None:
 
 def _fastapi_app_module(root: Path, service_path: Path) -> str | None:
     for path in sorted(service_path.rglob("*.py")):
+        if _is_ignored(path, root):
+            continue
         text = _read_text(path)
         if "FastAPI(" not in text or "app" not in text:
             continue
@@ -434,4 +506,12 @@ def _read_text(path: Path) -> str:
 
 def _is_ignored(path: Path, root: Path) -> bool:
     relative_parts = path.relative_to(root).parts
-    return any(part in {".git", "__pycache__", ".pytest_cache"} for part in relative_parts)
+    return any(part in IGNORED_DIRS for part in relative_parts)
+
+
+def _is_ignored_path(path: Path, root: Path) -> bool:
+    try:
+        relative_parts = path.relative_to(root).parts
+    except ValueError:
+        return False
+    return any(part in IGNORED_DIRS for part in relative_parts)

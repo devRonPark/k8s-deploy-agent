@@ -18,12 +18,19 @@ Use this index to avoid rereading unrelated files.
 | `.harness/events/planning.jsonl` | Planning proposal event log |
 | `.harness/shared/planning/` | Planning context runs, proposed task files, and decomposition reports |
 | `.harness/tasks/` | Task-specific live context directories |
+| `.harness/tasks/8.1/` | Live context, evidence, and task snapshot for monorepo workspace service discovery work |
+| `.harness/tasks/8.2/` | Live context, evidence, and task snapshot for evidence-based port analyzer work |
+| `.harness/tasks/8.3/` | Live context, evidence, and task snapshot for env/dependency analyzer work |
+| `.harness/tasks/8.4/` | Live context, evidence, and task snapshot for WorkloadManifestPlan builder work |
+| `.harness/tasks/8.5/` | Live context, evidence, and task snapshot for GitOps renderer WorkloadManifestPlan migration |
+| `.harness/tasks/8.6/` | Live context, evidence, and task snapshot for the manual-actions.md report work |
 | `agents/task-decomposer.md` | Task splitting and planning gate |
 | `agents/test-agent.md` | Acceptance and test verification gate |
 | `agents/quality-gates.md` | Shared scope, YAGNI, review, and reporting gate |
 | `.agents/skills/` | Codex repo-scoped harness workflow skills |
 | `.claude/commands/` | Claude Code local command wrappers for harness workflows |
 | `scripts/tasklib.py` | Shared JSON-backed task state helpers |
+| `scripts/show_task.py` | Print one task's fields and depends status without reading the whole `tasks/index.json` |
 | `scripts/validate_tasks.py` | Validate `tasks/index.json` structure and task rules |
 | `scripts/sync_plans.py` | Regenerate `Plans.md` from `tasks/index.json` |
 | `scripts/build_planning_context.py` | Create planning proposal context runs |
@@ -41,10 +48,15 @@ Use this index to avoid rereading unrelated files.
 | `pyproject.toml` | Python package and script configuration |
 | `analyzer.py` | Repository service discovery and BuildProfile generation |
 | `build_profile.py` | Dockerfile proposal pre-analysis BuildProfile data model |
+| `manifest_plan.py` | Workload manifest planning models and deterministic port candidate analysis |
 | `dockerfile_gate.py` | Dockerfile proposal confidence and unresolved-question gate |
 | `dockerfile_proposal.py` | Review-only Dockerfile proposal renderer |
 | `dockerfile_validation.py` | Dockerfile proposal validation report renderer |
+| `gitops.py` | GitOps Deployment/Service/ConfigMap YAML renderer, driven by `WorkloadManifestPlan.confirmed` (no `RepositoryAnalysis.services` guessing, no port fallback) |
+| `manual_actions.py` | Renders `.agent/reports/manual-actions.md`: skipped manifests, unresolved/conflicting ports, required secret keys, stateful/external dependencies, external exposure note, GitOps vs Jenkins image tag note |
 | `ui.py` | Static dry-run dashboard renderer |
 | `tests/test_cli_dry_run.py` | Main dry-run behavior tests |
 | `tests/test_build_profile.py` | BuildProfile analyzer behavior tests |
+| `tests/test_manifest_plan.py` | Workload manifest planning and port analysis behavior tests |
+| `tests/test_gitops_manifest_plan.py` | GitOps renderer confirmed-workload rendering and skip behavior tests |
 | `web.py` | Local operator console HTTP server, source input mode handling, and HTML shell |

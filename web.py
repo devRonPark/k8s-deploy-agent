@@ -44,7 +44,7 @@ FORM_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ),
     (
         "GitOps target",
-        "Rancher Fleet 산출물이 놓일 내부 GitOps repository 위치입니다.",
+        "1차 테스트에서는 비워둘 수 있고, 실제 write-back 준비 전에 내부 GitOps 위치를 입력합니다.",
         ("gitops_repo_url", "gitops_branch", "gitops_path", "gitops_credential_id"),
     ),
     (
@@ -60,6 +60,13 @@ SOURCE_INPUT_MODES = {"clone", "local"}
 DEFAULT_SOURCE_INPUT_MODE = "clone"
 LOCAL_SOURCE_REPO_PATH_FIELD = "local_source_repo_path"
 SOURCE_INPUT_MODE_FIELD = "source_input_mode"
+PUBLIC_SAMPLE_REPO_URL = "https://github.com/fastapi/full-stack-fastapi-template.git"
+PUBLIC_SAMPLE_BRANCH = "main"
+PUBLIC_SOURCE_CREDENTIAL_ID = "public-source"
+GITOPS_TARGET_FIELDS = ("gitops_repo_url", "gitops_branch", "gitops_path", "gitops_credential_id")
+FIRST_TEST_GITOPS_REPO_URL = "https://gitops.example.local/review-only.git"
+FIRST_TEST_GITOPS_BRANCH = "main"
+FIRST_TEST_GITOPS_CREDENTIAL_ID = "review-only-gitops-credential"
 
 
 @dataclass(frozen=True)
@@ -111,6 +118,14 @@ def validate_console_payload(values: Mapping[str, str]) -> ConsoleValidationResu
                 "source_credential_id": "local-source",
                 "source_access_token_env": "",
             }
+    elif _is_anonymous_clone(payload):
+        payload = {
+            **payload,
+            "source_credential_id": PUBLIC_SOURCE_CREDENTIAL_ID,
+            "source_access_token_env": "",
+        }
+
+    payload = _with_first_test_gitops_defaults(payload)
 
     try:
         config = DemoConfig.from_mapping(payload)
@@ -416,6 +431,25 @@ def render_operator_console(
       font-size: 12px;
       margin: 0;
     }
+    .sample-preset {
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      padding: 10px;
+    }
+    .sample-preset strong,
+    .sample-preset span {
+      display: block;
+      overflow-wrap: anywhere;
+    }
+    .sample-preset span {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 2px;
+    }
     input {
       width: 100%;
       min-height: 36px;
@@ -601,6 +635,10 @@ def render_operator_console(
       }
       .layout, .cards, .workflow, .summary-grid {
         grid-template-columns: 1fr;
+      }
+      .sample-preset {
+        align-items: stretch;
+        flex-direction: column;
       }
     }
   </style>
@@ -1075,6 +1113,13 @@ def _form_inputs(values: Mapping[str, str] | None = None) -> str:
 
 
 def _source_repository_mode_fields(form_values: Mapping[str, str]) -> str:
+    sample_control = f"""<div class="sample-preset">
+          <div>
+            <strong>FastAPI public sample</strong>
+            <span>{escape(PUBLIC_SAMPLE_REPO_URL)} · branch {escape(PUBLIC_SAMPLE_BRANCH)}</span>
+          </div>
+          <button type="submit" class="secondary" formaction="/sample">sample 값 채우기</button>
+        </div>"""
     clone_fields = []
     for name in ("source_repo_url", "source_branch", "source_credential_id", "source_access_token_env"):
         label, placeholder = FORM_FIELD_LOOKUP[name]
@@ -1092,12 +1137,51 @@ def _source_repository_mode_fields(form_values: Mapping[str, str]) -> str:
     </label>"""
     return f"""<fieldset class="clone-source-fields">
           <legend>source repository URL clone</legend>
+          {sample_control}
           <div class="field-grid">{''.join(clone_fields)}</div>
         </fieldset>
         <fieldset class="local-source-fields">
           <legend>서버 local path</legend>
           <div class="field-grid">{local_fields}</div>
         </fieldset>"""
+
+
+def _is_anonymous_clone(payload: Mapping[str, str]) -> bool:
+    return not str(payload.get("source_credential_id", "")).strip() and not str(
+        payload.get("source_access_token_env", "")
+    ).strip()
+
+
+def _with_first_test_gitops_defaults(payload: Mapping[str, str]) -> dict[str, str]:
+    next_payload = dict(payload)
+    if any(str(next_payload.get(field, "")).strip() for field in GITOPS_TARGET_FIELDS):
+        return next_payload
+
+    app_name = str(next_payload.get("app_name", "")).strip() or "app"
+    next_payload.update(
+        {
+            "gitops_repo_url": FIRST_TEST_GITOPS_REPO_URL,
+            "gitops_branch": FIRST_TEST_GITOPS_BRANCH,
+            "gitops_path": f"apps/{app_name}",
+            "gitops_credential_id": FIRST_TEST_GITOPS_CREDENTIAL_ID,
+        }
+    )
+    return next_payload
+
+
+def _sample_form_values(values: Mapping[str, str]) -> dict[str, str]:
+    sample = {field: str(values.get(field, "")).strip() for field, _, _ in FORM_FIELDS}
+    sample.update(
+        {
+            SOURCE_INPUT_MODE_FIELD: "clone",
+            LOCAL_SOURCE_REPO_PATH_FIELD: "",
+            "source_repo_url": PUBLIC_SAMPLE_REPO_URL,
+            "source_branch": PUBLIC_SAMPLE_BRANCH,
+            "source_credential_id": "",
+            "source_access_token_env": "",
+        }
+    )
+    return sample
 
 
 class OperatorConsoleHandler(BaseHTTPRequestHandler):
@@ -1119,14 +1203,16 @@ class OperatorConsoleHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
-        if path not in {"/validate", "/dry-run"}:
+        if path not in {"/validate", "/dry-run", "/sample"}:
             self.send_error(HTTPStatus.NOT_FOUND, "Not found")
             return
 
         content_length = int(self.headers.get("Content-Length", "0") or "0")
         raw_body = self.rfile.read(content_length).decode("utf-8")
         payload = {key: values[-1] for key, values in parse_qs(raw_body, keep_blank_values=True).items()}
-        if path == "/validate":
+        if path == "/sample":
+            body = render_operator_console(form_values=_sample_form_values(payload)).encode("utf-8")
+        elif path == "/validate":
             validation = validate_console_payload(payload)
             body = render_operator_console(validation=validation, form_values=payload).encode("utf-8")
         else:

@@ -30,6 +30,7 @@ customer environment. Do not introduce external SaaS calls.
 - Package manager: uv
 - Entry point: `k8s-deploy-agent`
 - Default verification: `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`
+- Local `web` startup uses `127.0.0.1:8080` by default; do not introduce a different port unless the user explicitly asks for it.
 
 ## Read Order
 

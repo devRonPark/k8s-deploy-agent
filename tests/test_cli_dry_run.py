@@ -3,9 +3,13 @@ from collections import Counter
 from html.parser import HTMLParser
 from pathlib import Path
 
+import pytest
+
 import k8s_deploy_agent.cli as cli
 from k8s_deploy_agent.cli import main
+from k8s_deploy_agent.config import DemoConfig
 from k8s_deploy_agent.redaction import find_secret_leaks
+from k8s_deploy_agent.source_repo import clone_source_repository
 from k8s_deploy_agent.web import render_operator_console, run_console_dry_run, validate_console_payload
 
 
@@ -219,6 +223,112 @@ def test_dry_run_clones_source_repo_from_config_when_repo_is_omitted(tmp_path):
     assert "| frontend | node | frontend | frontend/Dockerfile |" in report
 
 
+def test_dry_run_manual_actions_report_lists_skipped_ports_secrets_dependencies_and_image_tag(tmp_path):
+    repo = tmp_path / "sample-repo"
+    backend = repo / "backend"
+    backend.mkdir(parents=True)
+    (backend / "requirements.txt").write_text("fastapi\n", encoding="utf-8")
+    (backend / "uv.lock").write_text("", encoding="utf-8")
+    (backend / "Dockerfile").write_text("FROM python:3.12\nEXPOSE 8000\n", encoding="utf-8")
+    backend_app = backend / "app"
+    backend_app.mkdir()
+    (backend_app / "main.py").write_text("from fastapi import FastAPI\napp = FastAPI()\n", encoding="utf-8")
+    (backend / ".env.example").write_text(
+        "SECRET_KEY=super-secret-value\nPOSTGRES_SERVER=db\n", encoding="utf-8"
+    )
+
+    worker = repo / "worker"
+    worker.mkdir()
+    (worker / "requirements.txt").write_text("fastapi\n", encoding="utf-8")
+    (worker / "uv.lock").write_text("", encoding="utf-8")
+    (worker / "Dockerfile").write_text("FROM python:3.12\n", encoding="utf-8")
+    worker_app = worker / "app"
+    worker_app.mkdir()
+    (worker_app / "main.py").write_text("from fastapi import FastAPI\napp = FastAPI()\n", encoding="utf-8")
+
+    frontend = repo / "frontend"
+    frontend.mkdir()
+    (frontend / "package.json").write_text(
+        '{"scripts":{"build":"vite build"},"dependencies":{"vite":"latest"}}\n', encoding="utf-8"
+    )
+    (frontend / "nginx.conf").write_text("server { listen 80; }\n", encoding="utf-8")
+
+    config = write_config(tmp_path)
+    output = tmp_path / "out"
+
+    exit_code = main(
+        [
+            "dry-run",
+            "--config",
+            str(config),
+            "--repo",
+            str(repo),
+            "--output",
+            str(output),
+            "--image-tag",
+            "sha-123",
+        ]
+    )
+
+    assert exit_code == 0
+    manual_actions_path = output / ".agent/reports/manual-actions.md"
+    assert manual_actions_path.is_file()
+    report = manual_actions_path.read_text(encoding="utf-8")
+
+    assert "worker" in report
+    assert "no confirmed container port evidence found" in report
+    assert "SECRET_KEY" in report
+    assert "postgres" in report
+    assert "frontend" in report
+    assert "reverse" in report.lower()
+    assert "sha-123" in report
+    assert "${BUILD_NUMBER}" in report
+
+    assert "super-secret-value" not in report
+
+
+def minimal_demo_config(**overrides: object) -> DemoConfig:
+    fields: dict[str, object] = {
+        "source_repo_url": "https://gitea.example.local/team/source.git",
+        "source_branch": "main",
+        "source_credential_id": "public-source",
+        "gitops_repo_url": "https://gitops.example.local/review-only.git",
+        "gitops_branch": "main",
+        "gitops_path": ".",
+        "gitops_credential_id": "review-only-gitops-credential",
+        "app_name": "demo",
+        "environment": "dev",
+    }
+    fields.update(overrides)
+    return DemoConfig(**fields)
+
+
+def test_clone_source_repository_anonymous_failure_includes_credential_hint(tmp_path):
+    config = minimal_demo_config(source_repo_url=(tmp_path / "missing-repo").as_posix())
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+
+    with pytest.raises(ValueError) as excinfo:
+        clone_source_repository(config, work_dir)
+
+    assert "private repository면 source credential ID를 입력하세요" in str(excinfo.value)
+
+
+def test_clone_source_repository_authenticated_failure_omits_credential_hint(tmp_path, monkeypatch):
+    monkeypatch.setenv("K8S_DEPLOY_AGENT_TEST_TOKEN", "x" * 40)
+    config = minimal_demo_config(
+        source_repo_url=(tmp_path / "missing-repo").as_posix(),
+        source_access_token_env="K8S_DEPLOY_AGENT_TEST_TOKEN",
+    )
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+
+    with pytest.raises(ValueError) as excinfo:
+        clone_source_repository(config, work_dir)
+
+    assert "private repository면 source credential ID를 입력하세요" not in str(excinfo.value)
+
+
 def test_redaction_detects_token_like_values_even_in_credential_id_fields():
     leaks = find_secret_leaks(
         {
@@ -272,6 +382,9 @@ def test_operator_console_shell_is_offline_first_and_secret_safe():
     assert "GitOps target" in html
     assert "Private registry" in html
     assert "source repository URL clone" in html
+    assert "FastAPI public sample" in html
+    assert 'formaction="/sample"' in html
+    assert "https://github.com/fastapi/full-stack-fastapi-template.git" in html
     assert "서버 local path 분석" in html
     assert "향후 확장" in html
     assert "assert_no_secret_values" in html
@@ -318,6 +431,67 @@ def test_console_payload_validation_clone_mode_requires_source_clone_fields():
         "Missing required config fields: source_repo_url, source_branch, source_credential_id" in message
         for message in result.messages
     )
+
+
+def test_console_payload_validation_public_github_clone_requires_only_url_and_branch():
+    result = validate_console_payload(
+        console_payload(
+            source_input_mode="clone",
+            source_repo_url="https://github.com/fastapi/full-stack-fastapi-template.git",
+            source_branch="main",
+            source_credential_id="",
+            source_access_token_env="",
+        )
+    )
+
+    assert result.ok
+    assert result.config is not None
+    assert result.config.source_repo_url == "https://github.com/fastapi/full-stack-fastapi-template.git"
+    assert result.config.source_branch == "main"
+    assert result.config.source_credential_id == "public-source"
+    assert result.config.source_access_token_env is None
+
+
+def test_console_payload_validation_arbitrary_public_clone_allows_empty_credential():
+    result = validate_console_payload(
+        console_payload(
+            source_input_mode="clone",
+            source_repo_url="https://github.com/octocat/Hello-World.git",
+            source_branch="master",
+            source_credential_id="",
+            source_access_token_env="",
+        )
+    )
+
+    assert result.ok
+    assert result.config is not None
+    assert result.config.source_repo_url == "https://github.com/octocat/Hello-World.git"
+    assert result.config.source_branch == "master"
+    assert result.config.source_credential_id == "public-source"
+    assert result.config.source_access_token_env is None
+
+
+def test_console_payload_validation_allows_first_test_without_gitops_target():
+    result = validate_console_payload(
+        console_payload(
+            gitops_repo_url="",
+            gitops_branch="",
+            gitops_path="",
+            gitops_credential_id="",
+            registry_url="",
+            registry_project="",
+            registry_credential_id="",
+            registry_ca_cert_credential_id="",
+        )
+    )
+
+    assert result.ok
+    assert result.config is not None
+    assert result.messages == ()
+    assert result.config.gitops_repo_url == "https://gitops.example.local/review-only.git"
+    assert result.config.gitops_branch == "main"
+    assert result.config.gitops_path == "apps/fastapi-demo"
+    assert result.config.gitops_credential_id == "review-only-gitops-credential"
 
 
 def test_console_payload_validation_local_mode_uses_path_without_clone_fields(tmp_path):
@@ -454,6 +628,38 @@ def test_console_dry_run_local_mode_generates_assets_from_valid_repo_path(tmp_pa
     assert (output_dir / "Jenkinsfile").is_file()
     assert (output_dir / "gitops/apps/backend/deployment.yaml").is_file()
     assert (output_dir / "gitops/apps/frontend/deployment.yaml").is_file()
+
+
+def test_console_dry_run_local_mode_allows_first_test_without_gitops_target(tmp_path):
+    repo = write_sample_repo(tmp_path)
+
+    result = run_console_dry_run(
+        console_payload(
+            source_input_mode="local",
+            local_source_repo_path=repo.as_posix(),
+            source_repo_url="",
+            source_branch="",
+            source_credential_id="",
+            source_access_token_env="",
+            gitops_repo_url="",
+            gitops_branch="",
+            gitops_path="",
+            gitops_credential_id="",
+            registry_url="",
+            registry_project="",
+            registry_credential_id="",
+            registry_ca_cert_credential_id="",
+        )
+    )
+
+    assert result.ok
+    assert result.config is not None
+    assert result.config.gitops_path == "apps/fastapi-demo"
+    assert result.output_dir is not None
+    output_dir = Path(result.output_dir)
+    assert (output_dir / "Jenkinsfile").is_file()
+    assert (output_dir / "gitops/fleet.yaml").is_file()
+    assert (output_dir / "gitops/apps/backend/deployment.yaml").is_file()
 
 
 def test_console_dry_run_local_mode_blocks_invalid_repo_paths(tmp_path):

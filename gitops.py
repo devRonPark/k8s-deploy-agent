@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from k8s_deploy_agent.analyzer import RepositoryAnalysis, ServiceCandidate
+from k8s_deploy_agent.analyzer import RepositoryAnalysis
 from k8s_deploy_agent.config import DemoConfig
+from k8s_deploy_agent.manifest_plan import WorkloadManifestPlan, build_workload_manifest_plans
 
 
 def render_gitops_manifests(
@@ -14,13 +15,12 @@ def render_gitops_manifests(
         "base/namespace.yaml": _namespace_yaml(config),
     }
 
-    for service in analysis.services:
-        if service.stack == "unsupported" or not service.dockerfile:
-            continue
-        base_path = f"apps/{service.name}"
-        manifests[f"{base_path}/deployment.yaml"] = _deployment_yaml(config, service, image_tag)
-        manifests[f"{base_path}/service.yaml"] = _service_yaml(config, service)
-        manifests[f"{base_path}/configmap.yaml"] = _configmap_yaml(config, service)
+    manifest_plan = build_workload_manifest_plans(config, analysis, image_tag)
+    for workload in manifest_plan.confirmed:
+        base_path = f"apps/{workload.service_name}"
+        manifests[f"{base_path}/deployment.yaml"] = _deployment_yaml(config, workload)
+        manifests[f"{base_path}/service.yaml"] = _service_yaml(config, workload)
+        manifests[f"{base_path}/configmap.yaml"] = _configmap_yaml(config, workload)
 
     return manifests
 
@@ -39,8 +39,9 @@ metadata:
 """
 
 
-def _deployment_yaml(config: DemoConfig, service: ServiceCandidate, image_tag: str) -> str:
-    name = _resource_name(config, service)
+def _deployment_yaml(config: DemoConfig, workload: WorkloadManifestPlan) -> str:
+    name = _resource_name(config, workload)
+    port = workload.container_port.value
     return f"""apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -57,18 +58,19 @@ spec:
         app: {name}
     spec:
       containers:
-        - name: {service.name}
-          image: {config.image_for(service.name, image_tag)}
+        - name: {workload.service_name}
+          image: {workload.image}
           ports:
-            - containerPort: 80
+            - containerPort: {port}
           envFrom:
             - configMapRef:
                 name: {name}-config
 """
 
 
-def _service_yaml(config: DemoConfig, service: ServiceCandidate) -> str:
-    name = _resource_name(config, service)
+def _service_yaml(config: DemoConfig, workload: WorkloadManifestPlan) -> str:
+    name = _resource_name(config, workload)
+    port = workload.container_port.value
     return f"""apiVersion: v1
 kind: Service
 metadata:
@@ -79,13 +81,13 @@ spec:
   selector:
     app: {name}
   ports:
-    - port: 80
-      targetPort: 80
+    - port: {port}
+      targetPort: {port}
 """
 
 
-def _configmap_yaml(config: DemoConfig, service: ServiceCandidate) -> str:
-    name = _resource_name(config, service)
+def _configmap_yaml(config: DemoConfig, workload: WorkloadManifestPlan) -> str:
+    name = _resource_name(config, workload)
     return f"""apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -95,5 +97,5 @@ data: {{}}
 """
 
 
-def _resource_name(config: DemoConfig, service: ServiceCandidate) -> str:
-    return f"{config.app_name}-{service.name}"
+def _resource_name(config: DemoConfig, workload: WorkloadManifestPlan) -> str:
+    return f"{config.app_name}-{workload.service_name}"

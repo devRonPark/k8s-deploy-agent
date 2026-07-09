@@ -76,7 +76,32 @@
 | Task | 내용 | DoD | Acceptance | Depends | Status | GH |
 |------|------|-----|------------|---------|--------|----|
 | 6.1 | operator console 단계형 UI/UX 개편 | web console이 입력, 검증, dry-run, 분석/산출물 리뷰, checklist를 단계형 workflow로 보여주고 generated asset preview를 기능별로 묶는다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 5.1 | cc:완료 | - |
-| 6.2 | web console public GitHub sample clone preset 추가 | web console에 `https://github.com/fastapi/full-stack-fastapi-template.git`와 `main` branch를 입력하는 sample 버튼이 있고, clone mode public GitHub repository validation은 source repo URL과 branch만으로 통과한다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 6.1 | cc:TODO | - |
+| 6.2 | web console public GitHub sample clone preset 추가 | web console에 `https://github.com/fastapi/full-stack-fastapi-template.git`와 `main` branch를 입력하는 sample 버튼이 있고, clone mode public GitHub repository validation은 source repo URL과 branch만으로 통과한다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 6.1 | cc:완료 | - |
+
+---
+
+## Week 7 - Anonymous Source Clone Fix
+
+| Task | 내용 | DoD | Acceptance | Depends | Status | GH |
+|------|------|-----|------------|---------|--------|----|
+| 7.1 | clone 모드에서 source_credential_id 없이 anonymous clone 허용 | web.py의 clone 모드 검증은 하드코딩된 URL만 예외 처리하던 `_is_public_sample_clone` 대신 일반화된 `_is_anonymous_clone`을 사용한다. source_credential_id와 source_access_token_env가 모두 비어 있으면 임의의 URL에 대해 anonymous clone placeholder(`public-source`)를 채우고 검증을 통과시킨다. FastAPI 데모 sample 버튼이 쓰는 `PUBLIC_SAMPLE_REPO_URL`/`PUBLIC_SAMPLE_BRANCH` 상수는 그대로 유지한다. | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | - | cc:완료 | - |
+| 7.2 | anonymous clone 인증 실패 시 안내 문구 추가 | source_repo.py의 clone_source_repository가 credential/token 없이(anonymous) clone을 시도했다가 실패하면, 기존 sanitized git stderr 메시지에 "private repository면 source credential ID를 입력하세요" 안내 문구를 덧붙여 ValueError를 발생시킨다. credential/token이 있었던 실패에는 안내 문구를 붙이지 않는다. | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 7.1 | cc:완료 | - |
+
+---
+
+## Week 8 - Evidence-based GitOps Manifest Planning
+
+| Task | 내용 | DoD | Acceptance | Depends | Status | GH |
+|------|------|-----|------------|---------|--------|----|
+| 8.1 | monorepo workspace service discovery 개선 | analyzer.py가 root-level app, backend/frontend/api/web/server/client, apps/*, services/*, packages/* 서비스 후보와 pnpm-workspace.yaml, turbo.json, nx.json, lerna.json, package.json workspaces 신호를 ignore directory 경계 안에서 감지한다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_build_profile.py -k monorepo | 4.1 | cc:완료 | - |
+| 8.2 | evidence 기반 port analyzer 추가 | manifest_plan.py 또는 동등 모듈에 PortCandidate 모델과 Dockerfile EXPOSE, docker-compose ports/expose/command, nginx listen, 명시 config/runtime command/package script port를 host/container/dev_server/reverse_proxy와 confirmed/inferred/unresolved로 구분하는 analyzer가 추가된다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_manifest_plan.py -k port | 8.1 | cc:완료 | - |
+| 8.3 | env var와 dependency analyzer 추가 | redaction.py가 public secret-key helper를 제공하고 manifest_plan.py 또는 동등 모듈이 .env/.env.example, docker-compose.yml, Python/Node/Java config에서 key 이름만 수집해 ConfigMap, Secret, public config, dependency manual action 후보를 raw value 없이 분류한다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_manifest_plan.py -k "env or dependency or redaction" | 8.1 | cc:완료 | - |
+| 8.4 | WorkloadManifestPlan builder 추가 | build_workload_manifest_plans(config, analysis, image_tag)가 service별 BuildProfile, port candidates, env plans, dependency plans, evidence를 결합해 confirmed workload와 unresolved_questions를 반환하고 Dockerfile proposal만으로는 confirmed manifest를 만들지 않는다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_manifest_plan.py -k workload | 8.2, 8.3 | cc:완료 | - |
+| 8.5 | GitOps renderer를 WorkloadManifestPlan 기반으로 전환 | gitops.py가 RepositoryAnalysis.services 직접 추측과 80 fallback 없이 WorkloadManifestPlan.confirmed workload만 Deployment, Service, ConfigMap YAML로 렌더링하고 confirmed container port를 containerPort와 targetPort에 사용한다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_gitops_manifest_plan.py | 8.4 | cc:완료 | - |
+| 8.6 | dry-run manual-actions.md report 추가 | dry-run output에 .agent/reports/manual-actions.md가 생성되고 skipped manifests, unresolved/conflicting ports, required secret keys, detected stateful/external dependencies, external exposure note, GitOps preview image tag와 Jenkins runtime image tag 차이를 기록한다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_cli_dry_run.py -k manual_actions | 8.5 | cc:완료 | - |
+| 8.7 | report와 dashboard를 manifest plan readiness로 전환 | repository-analysis.md와 index.html이 service별 app type, path, Dockerfile status, runtime command, port candidates, selected container port, config/secret keys, dependencies, manifest generation status, unresolved questions를 표시하고 dashboard ready 상태는 WorkloadManifestPlan.confirmed를 기준으로 계산된다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_cli_dry_run.py -k "manifest_plan or readiness" | 8.6 | cc:TODO | - |
+| 8.8 | README dry-run manifest analysis 원칙 업데이트 | README.md가 WorkloadManifestPlan 기반 dry-run 원칙, framework default port 금지, raw secret value 출력 금지, unresolved/manual action 처리, source/GitOps write-back 금지를 설명한다 | grep -q "WorkloadManifestPlan" README.md && grep -q "framework default" README.md && grep -q "manual action" README.md | 8.7 | cc:TODO | - |
+| 8.9 | fastapi-template 샘플 레포 기준 dry-run 통합 검증 추가 | tests/fixtures/fastapi_template/에 실제 fastapi/full-stack-fastapi-template의 backend/Dockerfile, backend/app/core/config.py, frontend/Dockerfile, frontend/nginx.conf, compose.yml, .env 핵심 구조를 반영한 고정 fixture를 두고, 이 fixture로 dry-run을 실행해 (1) backend 포트는 근거 없이 confirmed되지 않고 manual action으로 남고, (2) frontend 포트는 nginx listen 80 근거로 confirmed되며, (3) SECRET_KEY/POSTGRES_PASSWORD/FIRST_SUPERUSER_PASSWORD는 secret으로, POSTGRES_SERVER/PROJECT_NAME 등은 configmap 또는 public_config로 분류되고, (4) postgres dependency가 감지되는 것을 검증하는 통합 테스트가 추가된다. 이 중 하나라도 실패하면 8.1~8.7의 analyzer/manifest_plan/gitops 로직을 재조정한다. | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_fastapi_template_fixture.py | 8.7 | cc:TODO | - |
 
 ---
 

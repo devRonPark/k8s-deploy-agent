@@ -97,6 +97,71 @@ def test_analyzer_detects_root_level_app_repository(tmp_path: Path):
     assert profile.confirmed
 
 
+def test_analyzer_detects_monorepo_workspace_services_and_ignores_build_dirs(tmp_path: Path):
+    (tmp_path / "pnpm-workspace.yaml").write_text("packages:\n  - apps/*\n  - services/*\n", encoding="utf-8")
+    (tmp_path / "turbo.json").write_text('{"tasks":{}}\n', encoding="utf-8")
+    (tmp_path / "nx.json").write_text('{"workspaceLayout":{"appsDir":"apps"}}\n', encoding="utf-8")
+    (tmp_path / "lerna.json").write_text('{"packages":["packages/*"]}\n', encoding="utf-8")
+    (tmp_path / "package.json").write_text('{"private":true,"workspaces":["apps/*","packages/*"]}\n', encoding="utf-8")
+
+    web = tmp_path / "apps" / "web"
+    web.mkdir(parents=True)
+    (web / "package.json").write_text(
+        '{"scripts":{"build":"vite build","start":"vite --host 0.0.0.0 --port 3000"},"dependencies":{"vite":"latest"}}\n',
+        encoding="utf-8",
+    )
+    (web / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    (web / "Dockerfile").write_text("FROM node:22\nEXPOSE 3000\n", encoding="utf-8")
+
+    api = tmp_path / "services" / "api"
+    api.mkdir(parents=True)
+    (api / "requirements.txt").write_text("fastapi\n", encoding="utf-8")
+    (api / "Dockerfile").write_text("FROM python:3.12\nEXPOSE 8000\n", encoding="utf-8")
+    api_app = api / "app"
+    api_app.mkdir()
+    (api_app / "main.py").write_text("from fastapi import FastAPI\napp = FastAPI()\n", encoding="utf-8")
+
+    worker = tmp_path / "packages" / "worker"
+    worker.mkdir(parents=True)
+    (worker / "go.mod").write_text("module example.local/worker\n", encoding="utf-8")
+    (worker / "go.sum").write_text("", encoding="utf-8")
+    (worker / ".env").write_text("PORT=9090\n", encoding="utf-8")
+
+    ignored = tmp_path / "apps" / "web" / "node_modules" / "fake-service"
+    ignored.mkdir(parents=True)
+    (ignored / "package.json").write_text('{"scripts":{"start":"node server.js"}}\n', encoding="utf-8")
+
+    analysis = analyze_repository(tmp_path)
+
+    assert analysis.workspace_markers == (
+        "pnpm-workspace.yaml",
+        "turbo.json",
+        "nx.json",
+        "lerna.json",
+        "package.json workspaces",
+    )
+    assert analysis.service_names == ["web", "api", "worker"]
+    assert "apps/web/node_modules/fake-service/package.json" not in analysis.file_tree
+
+    services = {service.name: service for service in analysis.services}
+    assert services["web"].path == web
+    assert services["web"].reason == "workspace package.json"
+    assert services["api"].path == api
+    assert services["api"].reason == "workspace python dependency file"
+    assert services["worker"].path == worker
+    assert services["worker"].reason == "workspace unsupported Go module"
+
+    profiles = {profile.service_name: profile for profile in analysis.build_profiles}
+    assert profiles["web"].service_path == "apps/web"
+    assert profiles["web"].dependency_files == ("apps/web/package.json",)
+    assert profiles["web"].dockerfile_existing == "apps/web/Dockerfile"
+    assert profiles["api"].service_path == "services/api"
+    assert profiles["api"].runtime_command == "uvicorn services.api.app.main:app --host 0.0.0.0"
+    assert profiles["api"].exposed_port == 8000
+    assert profiles["worker"].service_path == "packages/worker"
+    assert profiles["worker"].app_type == "go"
+
+
 def test_analyzer_creates_java_and_go_build_profiles(tmp_path: Path):
     api = tmp_path / "api"
     api.mkdir()
