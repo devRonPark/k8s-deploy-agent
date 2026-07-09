@@ -80,6 +80,15 @@
 
 ---
 
+## Week 7 - Anonymous Source Clone Fix
+
+| Task | 내용 | DoD | Acceptance | Depends | Status | GH |
+|------|------|-----|------------|---------|--------|----|
+| 7.1 | clone 모드에서 source_credential_id 없이 anonymous clone 허용 | config.py의 REQUIRED_FIELDS에서 source_credential_id가 제거되어 DemoConfig가 빈 credential을 허용한다. web.py의 clone 모드 검증은 하드코딩된 `_is_public_sample_clone`(FastAPI 데모 URL 전용) 없이, source_credential_id와 source_access_token_env가 모두 비어 있으면 임의의 URL에 대해 anonymous clone placeholder(`public-source`)를 채우고 검증을 통과시킨다. 기존 `PUBLIC_SAMPLE_REPO_URL`/`PUBLIC_SAMPLE_BRANCH`/`_is_public_sample_clone` 특수 케이스 코드는 삭제된다. | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | - | cc:TODO | - |
+| 7.2 | anonymous clone 인증 실패 시 안내 문구 추가 | source_repo.py의 clone_source_repository가 credential/token 없이(anonymous) clone을 시도했다가 실패하면, 기존 sanitized git stderr 메시지에 "private repository면 source credential ID를 입력하세요" 안내 문구를 덧붙여 ValueError를 발생시킨다. credential/token이 있었던 실패에는 안내 문구를 붙이지 않는다. | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 7.1 | cc:TODO | - |
+
+---
+
 <!--
 Task 상태의 단일 출처는 tasks/index.json이다.
 Plans.md는 사람이 필요할 때 python3 scripts/sync_plans.py로 갱신하는
