@@ -23,6 +23,7 @@ Use this index to avoid rereading unrelated files.
 | `.harness/tasks/8.3/` | Live context, evidence, and task snapshot for env/dependency analyzer work |
 | `.harness/tasks/8.4/` | Live context, evidence, and task snapshot for WorkloadManifestPlan builder work |
 | `.harness/tasks/8.5/` | Live context, evidence, and task snapshot for GitOps renderer WorkloadManifestPlan migration |
+| `.harness/tasks/8.6/` | Live context, evidence, and task snapshot for the manual-actions.md report work |
 | `agents/task-decomposer.md` | Task splitting and planning gate |
 | `agents/test-agent.md` | Acceptance and test verification gate |
 | `agents/quality-gates.md` | Shared scope, YAGNI, review, and reporting gate |
@@ -52,6 +53,7 @@ Use this index to avoid rereading unrelated files.
 | `dockerfile_proposal.py` | Review-only Dockerfile proposal renderer |
 | `dockerfile_validation.py` | Dockerfile proposal validation report renderer |
 | `gitops.py` | GitOps Deployment/Service/ConfigMap YAML renderer, driven by `WorkloadManifestPlan.confirmed` (no `RepositoryAnalysis.services` guessing, no port fallback) |
+| `manual_actions.py` | Renders `.agent/reports/manual-actions.md`: skipped manifests, unresolved/conflicting ports, required secret keys, stateful/external dependencies, external exposure note, GitOps vs Jenkins image tag note |
 | `ui.py` | Static dry-run dashboard renderer |
 | `tests/test_cli_dry_run.py` | Main dry-run behavior tests |
 | `tests/test_build_profile.py` | BuildProfile analyzer behavior tests |

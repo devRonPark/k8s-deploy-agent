@@ -223,6 +223,70 @@ def test_dry_run_clones_source_repo_from_config_when_repo_is_omitted(tmp_path):
     assert "| frontend | node | frontend | frontend/Dockerfile |" in report
 
 
+def test_dry_run_manual_actions_report_lists_skipped_ports_secrets_dependencies_and_image_tag(tmp_path):
+    repo = tmp_path / "sample-repo"
+    backend = repo / "backend"
+    backend.mkdir(parents=True)
+    (backend / "requirements.txt").write_text("fastapi\n", encoding="utf-8")
+    (backend / "uv.lock").write_text("", encoding="utf-8")
+    (backend / "Dockerfile").write_text("FROM python:3.12\nEXPOSE 8000\n", encoding="utf-8")
+    backend_app = backend / "app"
+    backend_app.mkdir()
+    (backend_app / "main.py").write_text("from fastapi import FastAPI\napp = FastAPI()\n", encoding="utf-8")
+    (backend / ".env.example").write_text(
+        "SECRET_KEY=super-secret-value\nPOSTGRES_SERVER=db\n", encoding="utf-8"
+    )
+
+    worker = repo / "worker"
+    worker.mkdir()
+    (worker / "requirements.txt").write_text("fastapi\n", encoding="utf-8")
+    (worker / "uv.lock").write_text("", encoding="utf-8")
+    (worker / "Dockerfile").write_text("FROM python:3.12\n", encoding="utf-8")
+    worker_app = worker / "app"
+    worker_app.mkdir()
+    (worker_app / "main.py").write_text("from fastapi import FastAPI\napp = FastAPI()\n", encoding="utf-8")
+
+    frontend = repo / "frontend"
+    frontend.mkdir()
+    (frontend / "package.json").write_text(
+        '{"scripts":{"build":"vite build"},"dependencies":{"vite":"latest"}}\n', encoding="utf-8"
+    )
+    (frontend / "nginx.conf").write_text("server { listen 80; }\n", encoding="utf-8")
+
+    config = write_config(tmp_path)
+    output = tmp_path / "out"
+
+    exit_code = main(
+        [
+            "dry-run",
+            "--config",
+            str(config),
+            "--repo",
+            str(repo),
+            "--output",
+            str(output),
+            "--image-tag",
+            "sha-123",
+        ]
+    )
+
+    assert exit_code == 0
+    manual_actions_path = output / ".agent/reports/manual-actions.md"
+    assert manual_actions_path.is_file()
+    report = manual_actions_path.read_text(encoding="utf-8")
+
+    assert "worker" in report
+    assert "no confirmed container port evidence found" in report
+    assert "SECRET_KEY" in report
+    assert "postgres" in report
+    assert "frontend" in report
+    assert "reverse" in report.lower()
+    assert "sha-123" in report
+    assert "${BUILD_NUMBER}" in report
+
+    assert "super-secret-value" not in report
+
+
 def minimal_demo_config(**overrides: object) -> DemoConfig:
     fields: dict[str, object] = {
         "source_repo_url": "https://gitea.example.local/team/source.git",
