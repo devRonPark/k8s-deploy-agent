@@ -1,31 +1,28 @@
-# User Flow
+# User Flow — [기능/프로젝트 이름]
 
-## Primary Flow
+작성일: YYYY-MM-DD
+기준 문서: docs/PRD.md
 
-```text
-Open operator console
-  -> enter project and repository information
-  -> run repository analysis
-  -> review detected services
-  -> review generated assets
-  -> run validation checklist
-  -> export or prepare write-back
+## 핵심 플로우
+
+> PRD의 Goals 하나당 플로우 하나. 해피 패스 먼저, 분기는 그 다음.
+
+### [플로우 1 — 예: 가입 후 첫 액션]
+
+```mermaid
+flowchart TD
+    A[진입점] --> B{조건?}
+    B -->|예| C[다음 화면]
+    B -->|아니오| D[대안 경로]
+    C --> E[완료 상태]
 ```
 
-## Screens
+**엣지 케이스**
 
-| Screen | Purpose | Inputs | Outputs |
-|--------|---------|--------|---------|
-| Project Onboarding | Collect migration inputs | app, repo, registry, GitOps info | validated config |
-| Analysis | Show source repository findings | source repo | services and risks |
-| Asset Preview | Review generated files | analysis and config | Jenkinsfile/manifests |
-| Validation | Block unsafe output | generated files | pass/fail checklist |
+- [실패/이탈 지점과 그때의 동작 — 예: 인증 실패 시 재시도 3회 후 잠금]
 
-## Error States
+## 화면/상태 목록
 
-- Repository clone failure
-- Missing credential ID
-- Unsupported stack
-- Missing Dockerfile
-- Secret redaction failure
-- LLM endpoint unavailable
+| 화면·상태 | 진입 조건 | 이탈 경로 |
+|-----------|----------|----------|
+| [이름] | [어디서 오나] | [어디로 가나] |

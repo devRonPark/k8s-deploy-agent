@@ -1,29 +1,58 @@
-# Design
+# DESIGN.md — [기능/프로젝트 이름]
 
-## Product Surface
+작성일: YYYY-MM-DD
+기준 문서: docs/PRD.md, docs/UserFlow.md
 
-The UI is an operator console for Kubernetes migration preparation, not a marketing page.
+> **이 문서는 UI 구현의 single source of truth다.**
+> AI 에이전트(worker)는 화면을 만들 때마다 이 문서의 토큰·규칙만 사용한다 —
+> 색·간격·톤을 Task마다 즉흥 결정하지 않는다. UI Task는 이 문서 존재를
+> Depends로 걸어 게이트한다.
 
-## Visual Direction
+## 브랜드 성격
 
-- Dense, practical, operations-focused layout
-- Clear service readiness and validation state
-- No external fonts, CDNs, or remote assets
-- Works in customer internal networks
+[형용사 3개 이내 — 예: 차분한, 격려하는, 정직한. 이 성격이 아래 모든 선택의 근거]
 
-## Core Views
+## 색상 토큰
 
-| View | Purpose |
-|------|---------|
-| Project Onboarding | Gather source, GitOps, registry, and namespace inputs |
-| Repository Analysis | Show service detection and migration risks |
-| Generated Assets | Preview Jenkinsfile and GitOps manifests |
-| Validation Checklist | Show secret, namespace, image, and manifest checks |
-| LLM Review | Show on-prem LLM recommendations |
+> 아래 이름으로만 참조. hex 직접 사용 금지.
 
-## Interaction Rules
+| 토큰 | Light | Dark | 용도 |
+|------|-------|------|------|
+| `--bg` | [#hex] | [#hex] | 페이지 배경 |
+| `--surface` | [#hex] | [#hex] | 카드·패널 |
+| `--text` | [#hex] | [#hex] | 본문 |
+| `--text-muted` | [#hex] | [#hex] | 보조 텍스트 |
+| `--primary` | [#hex] | [#hex] | 주요 액션·강조 |
+| `--danger` | [#hex] | [#hex] | 삭제·경고 |
 
-- Do not auto-apply LLM recommendations.
-- Require explicit review before write-back.
-- Highlight unsupported services and missing Dockerfiles.
-- Keep secret values out of all UI states.
+## 타이포그래피
+
+| 용도 | 크기/굵기 | 비고 |
+|------|----------|------|
+| 화면 제목 | [예: 24px/700] | |
+| 본문 | [예: 16px/400] | |
+| 보조 | [예: 13px/400] | `--text-muted` |
+
+- 폰트: [예: Pretendard, system-ui fallback]
+
+## 간격·형태
+
+- 간격 스케일: [예: 4px 배수만 — 4/8/12/16/24/32]
+- 모서리: [예: 카드 12px, 버튼 8px]
+- 그림자: [예: 카드 1단계만, 팝오버 2단계]
+
+## 핵심 컴포넌트 규칙
+
+> PRD Goals에 등장하는 컴포넌트만. 전부 나열하지 말 것.
+
+| 컴포넌트 | 규칙 |
+|----------|------|
+| [예: 카드] | [상태별 모습 — 기본/호버/완료] |
+
+## 보이스 & 톤
+
+- [UI 문구 원칙 — 예: 명령형 금지, 실패 시 죄책감 주는 문구 금지]
+
+## 금지 사항
+
+- [예: 토큰 외 색상, 3단계 이상 그림자, 애니메이션 300ms 초과]

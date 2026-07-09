@@ -14,12 +14,16 @@
 | 0.2 | Python CLI 검증 명령 고정 | harness.toml과 AGENTS.md에 uv pytest 명령이 기록된다 | grep -q "uv run pytest -q" AGENTS.md && grep -q "uv run pytest -q" harness.toml | 0.1 | cc:완료 | - |
 | 0.3 | GitHub Actions CI 추가 | .github/workflows/ci.yml이 uv 기반 pytest를 실행한다 | test -f .github/workflows/ci.yml && grep -q "uv run pytest -q" .github/workflows/ci.yml | 0.1 | cc:완료 | - |
 
+---
+
 ## Week 1 - Operator Console Planning
 
 | Task | 내용 | DoD | Acceptance | Depends | Status | GH |
 |------|------|-----|------------|---------|--------|----|
 | 1.1 | Local operator console PRD 작성 | docs/PRD.md에 폐쇄망 operator console MVP 범위가 정리된다 | test -f docs/PRD.md | 0.1 | cc:완료 | - |
 | 1.2 | UI flow와 architecture 작성 | docs/UserFlow.md와 docs/Architecture.md에 web command, dry-run execution, LLM boundary가 정리된다 | test -f docs/UserFlow.md && test -f docs/Architecture.md | 1.1 | cc:완료 | - |
+
+---
 
 ## Week 2 - Local Operator Console
 
@@ -29,6 +33,8 @@
 | 2.2 | operator console config form payload 검증 추가 | UI 입력이 `DemoConfig` compatible payload로 검증되고 raw secret-like 값이 거부된다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 2.1 | cc:완료 | - |
 | 2.3 | operator console dry-run 실행 연결 | web flow가 기존 dry-run pipeline을 재사용해 output directory에 산출물을 생성한다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 2.2 | cc:완료 | - |
 | 2.4 | generated asset preview와 validation checklist 추가 | UI가 generated files와 blocking validation 상태를 local output 기준으로 표시한다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 2.3 | cc:완료 | - |
+
+---
 
 ## Week 3 - Dockerfile Generation Planning
 
@@ -47,17 +53,23 @@
 | 3.11 | `.dockerignore` proposal preview 추가 | BuildProfile 기반 ignore 후보가 review-only `.dockerignore` proposal artifact로 생성된다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 3.10 | cc:완료 | - |
 | 3.12 | Dockerfile proposal validation checklist 추가 | generated Dockerfile/.dockerignore proposals가 secret redaction, confidence gate, source write-back 없음 조건으로 검증된다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 3.11 | cc:완료 | - |
 
+---
+
 ## Week 4 - Repository Shape Coverage
 
 | Task | 내용 | DoD | Acceptance | Depends | Status | GH |
 |------|------|-----|------------|---------|--------|----|
 | 4.1 | root-level app repository 감지 추가 | repository root에 `package.json`, `pyproject.toml`, `requirements.txt`, `pom.xml`, `build.gradle`, 또는 `go.mod`가 있는 단일 앱 repo가 서비스 후보와 BuildProfile로 감지된다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 3.12 | cc:완료 | - |
 
+---
+
 ## Week 5 - Web Local Source Input
 
 | Task | 내용 | DoD | Acceptance | Depends | Status | GH |
 |------|------|-----|------------|---------|--------|----|
 | 5.1 | web form에서 local repo path 분석 지원 | clone/local mode 선택, local path validation, dry-run asset generation, source repo write-back 없음 조건이 구현된다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 2.4 | cc:완료 | - |
+
+---
 
 ## Week 6 - Operator Console UX
 
@@ -68,17 +80,43 @@
 ---
 
 <!--
-Task Status:
-  cc:TODO   - not started
-  cc:WIP    - in progress
-  cc:완료   - complete
+Task 상태의 단일 출처는 tasks/index.json이다.
+Plans.md는 사람이 필요할 때 python3 scripts/sync_plans.py로 갱신하는
+읽기용 snapshot이며 stale일 수 있다. 상태 판단과 CI 검증은 항상
+tasks/index.json을 기준으로 한다.
 
-Acceptance:
-  Use a command that can run from repository root.
-  Use "-" only when no machine-verifiable check exists.
-  Do not use always-success commands such as "|| true" or "|| echo skip".
+JSON status 값:
+  todo    — 미시작 (Plans.md 표시: cc:TODO)
+  wip     — 진행 중 (Plans.md 표시: cc:WIP)
+  done    — 완료 (Plans.md 표시: cc:완료)
+  blocked — 차단됨 (Plans.md 표시: cc:BLOCKED, blocked_reason 필수)
 
-DoD:
-  Write objective, inspectable outcomes.
-  Avoid broad tasks that mix analysis, UI, LLM, CI, and write-back.
+GH 컬럼:
+  -         — GitHub 미연동 또는 이슈 미생성
+  #N        — 연결된 GitHub Issue 번호 (harness-plan이 자동 기입)
+
+Acceptance 컬럼:
+  -         — 기계 검증 없음 (skip). "|| echo skip"처럼 항상 성공하는
+              패턴은 oracle을 무력화하므로 금지 — 검증 안 할 거면 "-"로 명시.
+  명령어     — 세션 에이전트가 완료 전 실행, 실패하면 done 전환 금지.
+              CI checkout 범위 밖 경로(예: ../다른-repo/)는 실행 불가 — 금지.
+              Given=repo checkout/Depends 산출물, When=명령 실행, Then=exit 0
+              또는 출력·파일·응답 검증이 되도록 쓴다.
+  예시: pytest tests/test_auth.py -k login
+  예시: curl -sf http://localhost/health | grep '"status":"ok"'
+  패턴별 예시:
+    파일 존재: test -f src/main.py
+    명령 성공: npm run build 2>&1 | grep -v error
+    HTTP 응답: curl -sf http://localhost:3000/health | grep ok
+    테스트 통과: pytest tests/ -x -q
+    출력 포함: go test ./... | grep -v SKIP
+  escaped pipe(예: grep 'a\|b')는 Acceptance 컬럼에서만 사용 — DoD 등 다른
+  컬럼에 쓰면 파서가 열 개수를 오인식한다.
+  * GitHub CI 스택 설치(npm ci 등)는 .github/workflows/ci.yml에서 설정
+
+DoD (Definition of Done) 작성 원칙:
+  - 검증 가능한 파일·명령·출력으로 기술
+  - "존재한다", "성공한다", "에러 0"처럼 객관적 기준
+  - "잘 작성된다", "좋다"처럼 주관적 기준 금지
+  - INVEST 기준: 독립 검증 가능, 관찰 가능한 가치, 1 PR 이내, 테스트 가능
 -->

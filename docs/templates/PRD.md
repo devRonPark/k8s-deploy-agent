@@ -1,38 +1,45 @@
-# PRD
+# PRD — [기능/프로젝트 이름]
 
-## Problem
+작성일: YYYY-MM-DD
+상태: 초안 | 검토중 | 확정
 
-Describe the customer migration problem and operational constraints.
+## 목적
 
-## Users
+[누가, 어떤 문제를, 왜 지금 해결하는지 — 한 문단]
 
-- Platform engineer
-- DevOps engineer
-- Migration operator
+## 대상 사용자
+
+[핵심 사용자 1~2 유형. "모두"는 답이 아님]
 
 ## Goals
 
-- Automate repetitive Kubernetes migration preparation.
-- Reduce human error in CI/GitOps asset creation.
-- Preserve customer on-premise and air-gapped operation.
+- [핵심 기능 1 — 사용자 관점 한 줄]
+- [핵심 기능 2]
+- [핵심 기능 3]
 
-## Non-Goals
+## Non-goals
 
-- External SaaS LLM dependency
-- Storing raw secrets
-- Destructive cluster operations without explicit approval
+- [의도적으로 안 하는 것 — 범위 방어선]
 
-## Requirements
+## 요구사항
 
-| ID | Requirement | Priority | Acceptance |
-|----|-------------|----------|------------|
-| R1 | | Must | |
+| # | 요구사항 | 우선순위 |
+|---|---------|---------|
+| R1 | [검증 가능한 문장으로] | must / should / could |
+
+## 성공 기준
+
+- [측정 가능한 기준 — 예: 가입→첫 액션 전환율 X%, 응답 p95 < Yms]
 
 ## Decisions
 
-| Date | Decision | Rationale |
-|------|----------|-----------|
+> 인터뷰·설계 중 확정된 결정. 근거 없이 결정만 쓰지 말 것.
+> 큰 결정이 쌓이면 docs/adr/ 로 분리.
+
+| 날짜 | 결정 | 근거 | 대안(기각 이유) |
+|------|------|------|----------------|
+| YYYY-MM-DD | [결정] | [근거] | [대안 — 기각 이유] |
 
 ## Open Questions
 
-- 
+- [ ] [미해결 질문 — 답 나오면 위 섹션으로 이동]

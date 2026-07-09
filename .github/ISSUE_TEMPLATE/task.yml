@@ -1,26 +1,64 @@
 name: Task
-description: Track a harness task
-title: "[Task] "
+description: tasks/index.json Task를 GitHub Issue로 등록
 labels: ["task"]
 body:
   - type: input
-    id: plans-task
+    id: task-id
     attributes:
-      label: Plans.md Task
+      label: Task ID
+      description: tasks/index.json의 Task ID (예: 1.1)
       placeholder: "1.1"
     validations:
       required: true
-  - type: textarea
-    id: scope
+
+  - type: dropdown
+    id: week
     attributes:
-      label: Scope
-      description: What should change?
+      label: Week
+      options:
+        - Week 1
+        - Week 2
+        - Week 3
+        - Week 4
+        - Week 5
+        - Week 6
     validations:
       required: true
+
   - type: textarea
-    id: acceptance
+    id: description
     attributes:
-      label: Acceptance
-      description: Runnable command or objective check
+      label: 내용
+      description: 무엇을 구현/개선하는가
+    validations:
+      required: true
+
+  - type: textarea
+    id: dod
+    attributes:
+      label: DoD (Definition of Done)
+      description: 검증 가능한 완료 기준 (파일 존재, 명령 성공, 에러 0 등)
+    validations:
+      required: true
+
+  - type: input
+    id: depends
+    attributes:
+      label: 의존 Task
+      description: 선행 Task ID (없으면 비워둠)
+      placeholder: "1.0"
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 영역
+      options:
+        - 기능 구현
+        - 버그 수정
+        - 리팩터링
+        - 테스트
+        - 문서
+        - 인프라 / CI
+        - 기타
     validations:
       required: true

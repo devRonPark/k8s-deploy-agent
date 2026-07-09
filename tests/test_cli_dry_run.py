@@ -254,6 +254,12 @@ def test_operator_console_shell_is_offline_first_and_secret_safe():
     assert 'name="source_input_mode" value="clone" checked' in html
     assert 'name="source_input_mode" value="local"' in html
     assert 'name="local_source_repo_path"' in html
+    assert 'class="clone-source-fields"' in html
+    assert 'class="local-source-fields"' in html
+    assert 'form:has(input[name="source_input_mode"][value="clone"]:checked) .local-source-fields' in html
+    assert 'form:has(input[name="source_input_mode"][value="local"]:checked) .clone-source-fields' in html
+    assert "Source credential ID (Private repo only)" in html
+    assert "local source repository path (absolute path)" in html
     assert "입력 검증" in html
     assert "dry-run 실행" in html
     assert "credential ID만 입력" in html
@@ -505,3 +511,24 @@ def test_operator_console_retains_submitted_source_mode_and_local_path(tmp_path)
 
     assert 'name="source_input_mode" value="local" checked' in html
     assert f'name="local_source_repo_path" value="{repo.as_posix()}"' in html
+
+
+def test_console_payload_validation_local_mode_ignores_hidden_clone_fields(tmp_path):
+    repo = write_sample_repo(tmp_path)
+
+    result = validate_console_payload(
+        console_payload(
+            source_input_mode="local",
+            local_source_repo_path=repo.as_posix(),
+            source_repo_url="",
+            source_branch="",
+            source_credential_id="github_pat_abcdefghijklmnopqrstuvwxyz1234567890",
+            source_access_token_env="not-an-env-var",
+        )
+    )
+
+    assert result.ok
+    assert result.config is not None
+    assert result.config.source_repo_url == repo.resolve().as_posix()
+    assert result.config.source_branch == "local"
+    assert result.config.source_credential_id == "local-source"

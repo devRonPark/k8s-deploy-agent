@@ -1,9 +1,15 @@
-# Harness configuration for Codex CLI workflow.
+# Harness v4 configuration for Codex CLI / Claude Code workflow.
 
 [project]
 name = "k8s-deploy-agent"
 version = "0.1.0"
 description = "On-premise Kubernetes migration agent that analyzes source repositories and generates Jenkins CI plus Rancher Fleet GitOps assets."
+
+[agent]
+# default = "security-reviewer"
+
+[env]
+# CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = "1"
 
 [runtime]
 agent = "codex-cli"
@@ -18,13 +24,24 @@ dry_run = "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run k8s-deploy-agen
 [safety.permissions]
 deny = [
   "sudo",
+  "Bash(sudo:*)",
   "git push --force",
 ]
 ask = [
   "rm -r",
   "rm -rf",
   "git push",
+  "Bash(rm -r:*)",
+  "Bash(rm -rf:*)",
+  "Bash(rm -fr:*)",
+  "Bash(rm -R:*)",
+  "Bash(rm -Rf:*)",
+  "Bash(rm -fR:*)",
+  "Bash(git push --force:*)",
 ]
+
+[safety.sandbox]
+failIfUnavailable = false
 
 [safety.files]
 secret_values_forbidden = true
@@ -54,4 +71,10 @@ agent = "agents/test-agent.md"
 [plan]
 auto_run = true
 agent = "agents/task-decomposer.md"
+decomposer_mode = "inline"
+decomposer_command = ""
+allow_inline_fallback = true
+proposal_dir = ".harness/shared/planning"
+planning_event_log = ".harness/events/planning.jsonl"
 gate_work = true
+allow_mid_work_split = true

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(sudo:*)"
+    ],
+    "ask": [
+      "Bash(rm -r:*)",
+      "Bash(git push --force:*)"
+    ]
+  }
+}

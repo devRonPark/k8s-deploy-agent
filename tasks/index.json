@@ -1,0 +1,291 @@
+{
+  "version": 1,
+  "tasks": [
+    {
+      "id": "0.1",
+      "title": "Codex harness 기본 파일 추가",
+      "dod": "AGENTS.md, harness.toml, Plans.md, .harness/ 상태 문서가 존재한다",
+      "acceptance": "test -f AGENTS.md && test -f harness.toml && test -f Plans.md && test -f .harness/STATE.md",
+      "depends": [],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 0 - Harness Bootstrap"
+    },
+    {
+      "id": "0.2",
+      "title": "Python CLI 검증 명령 고정",
+      "dod": "harness.toml과 AGENTS.md에 uv pytest 명령이 기록된다",
+      "acceptance": "grep -q \"uv run pytest -q\" AGENTS.md && grep -q \"uv run pytest -q\" harness.toml",
+      "depends": [
+        "0.1"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 0 - Harness Bootstrap"
+    },
+    {
+      "id": "0.3",
+      "title": "GitHub Actions CI 추가",
+      "dod": ".github/workflows/ci.yml이 uv 기반 pytest를 실행한다",
+      "acceptance": "test -f .github/workflows/ci.yml && grep -q \"uv run pytest -q\" .github/workflows/ci.yml",
+      "depends": [
+        "0.1"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 0 - Harness Bootstrap"
+    },
+    {
+      "id": "1.1",
+      "title": "Local operator console PRD 작성",
+      "dod": "docs/PRD.md에 폐쇄망 operator console MVP 범위가 정리된다",
+      "acceptance": "test -f docs/PRD.md",
+      "depends": [
+        "0.1"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 1 - Operator Console Planning"
+    },
+    {
+      "id": "1.2",
+      "title": "UI flow와 architecture 작성",
+      "dod": "docs/UserFlow.md와 docs/Architecture.md에 web command, dry-run execution, LLM boundary가 정리된다",
+      "acceptance": "test -f docs/UserFlow.md && test -f docs/Architecture.md",
+      "depends": [
+        "1.1"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 1 - Operator Console Planning"
+    },
+    {
+      "id": "2.1",
+      "title": "`web` command 기본 local console shell 추가",
+      "dod": "`k8s-deploy-agent web --host 127.0.0.1 --port 8080`가 외부 asset 없이 local operator console HTML을 제공한다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "1.2"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 2 - Local Operator Console"
+    },
+    {
+      "id": "2.2",
+      "title": "operator console config form payload 검증 추가",
+      "dod": "UI 입력이 `DemoConfig` compatible payload로 검증되고 raw secret-like 값이 거부된다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "2.1"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 2 - Local Operator Console"
+    },
+    {
+      "id": "2.3",
+      "title": "operator console dry-run 실행 연결",
+      "dod": "web flow가 기존 dry-run pipeline을 재사용해 output directory에 산출물을 생성한다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "2.2"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 2 - Local Operator Console"
+    },
+    {
+      "id": "2.4",
+      "title": "generated asset preview와 validation checklist 추가",
+      "dod": "UI가 generated files와 blocking validation 상태를 local output 기준으로 표시한다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "2.3"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 2 - Local Operator Console"
+    },
+    {
+      "id": "3.1",
+      "title": "Dockerfile 자동 생성 범위 정의",
+      "dod": "Dockerfile 생성의 입력, 출력, 제한, and validation gate가 문서로 정리된다",
+      "acceptance": "test -f docs/DockerfilePlan.md",
+      "depends": [
+        "2.4"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.2",
+      "title": "BuildProfile 데이터 모델 추가",
+      "dod": "service별 Dockerfile proposal 전 단계 정보를 담는 BuildProfile 구조가 정의된다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "3.1"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.3",
+      "title": "repository analyzer BuildProfile 생성",
+      "dod": "Python/Node/Java/Go service 후보에서 dependency file, lockfile, build tool, existing Dockerfile evidence가 수집된다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "3.2"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.4",
+      "title": "runtime command와 port evidence 분석",
+      "dod": "analyzer가 runtime command 후보와 port evidence를 confidence와 함께 profile에 기록한다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "3.3"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.5",
+      "title": "Dockerfile proposal gate 추가",
+      "dod": "low-confidence 또는 unresolved profile은 Dockerfile proposal 대상에서 제외된다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "3.4"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.6",
+      "title": "BuildProfile 리포트 출력 추가",
+      "dod": "repository analysis report와 operator console preview에 BuildProfile evidence와 unresolved questions가 표시된다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "3.5"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.7",
+      "title": "Python Dockerfile proposal preview 추가",
+      "dod": "confirmed Python BuildProfile에서 review-only Dockerfile proposal artifact가 생성된다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "3.6"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.8",
+      "title": "Node.js Dockerfile proposal preview 추가",
+      "dod": "confirmed Node BuildProfile에서 review-only Dockerfile proposal artifact가 생성된다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "3.7"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.9",
+      "title": "Java Dockerfile proposal preview 추가",
+      "dod": "confirmed Java BuildProfile에서 review-only Dockerfile proposal artifact가 생성된다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "3.8"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.10",
+      "title": "Go Dockerfile proposal preview 추가",
+      "dod": "confirmed Go BuildProfile에서 review-only Dockerfile proposal artifact가 생성된다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "3.9"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.11",
+      "title": "`.dockerignore` proposal preview 추가",
+      "dod": "BuildProfile 기반 ignore 후보가 review-only `.dockerignore` proposal artifact로 생성된다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "3.10"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.12",
+      "title": "Dockerfile proposal validation checklist 추가",
+      "dod": "generated Dockerfile/.dockerignore proposals가 secret redaction, confidence gate, source write-back 없음 조건으로 검증된다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "3.11"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "4.1",
+      "title": "root-level app repository 감지 추가",
+      "dod": "repository root에 `package.json`, `pyproject.toml`, `requirements.txt`, `pom.xml`, `build.gradle`, 또는 `go.mod`가 있는 단일 앱 repo가 서비스 후보와 BuildProfile로 감지된다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "3.12"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 4 - Repository Shape Coverage"
+    },
+    {
+      "id": "5.1",
+      "title": "web form에서 local repo path 분석 지원",
+      "dod": "clone/local mode 선택, local path validation, dry-run asset generation, source repo write-back 없음 조건이 구현된다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "2.4"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 5 - Web Local Source Input"
+    },
+    {
+      "id": "6.1",
+      "title": "operator console 단계형 UI/UX 개편",
+      "dod": "web console이 입력, 검증, dry-run, 분석/산출물 리뷰, checklist를 단계형 workflow로 보여주고 generated asset preview를 기능별로 묶는다",
+      "acceptance": "UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q",
+      "depends": [
+        "5.1"
+      ],
+      "status": "done",
+      "gh": "-",
+      "section": "Week 6 - Operator Console UX"
+    }
+  ]
+}

@@ -95,3 +95,18 @@ Append meaningful work and errors here. Keep task status in `Plans.md`.
 - Updated UI regression tests for the step workflow, grouped inputs, grouped preview, offline-first HTML, and duplicate input-name guard.
 - Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_cli_dry_run.py -q`: 20 passed.
 - Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 27 passed.
+- Adjusted the web console Source repository form so `clone` mode shows only Source repository URL, Source branch, Source credential ID, and Source access token env, while `local` mode shows only local source repository path.
+- Updated local-mode validation to ignore hidden clone-only source fields so stale URL/branch/credential/env values do not block local path analysis.
+- Added UI and validation regression tests for source-mode-specific field visibility and hidden clone field handling.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 28 passed.
+
+## 2026-07-09
+
+- Applied `devRonPark/cc-harness-template` v4 structure to this repository without changing application runtime code.
+- Added JSON-backed task state in `tasks/index.json` by migrating the existing `Plans.md` task table.
+- Added task management scripts under `scripts/`, Codex repo-scoped skills under `.agents/skills/`, Claude command/memory scaffolding under `.claude/`, and shared quality gate documentation.
+- Updated `AGENTS.md`, added `CLAUDE.md` and `BLUEPRINT.md`, and expanded `harness.toml` for planning proposal settings while preserving uv pytest verification and on-premise safety rules.
+- Replaced `plans-guard.yml` with `tasks/index.json` validation and `Plans.md` sync checks; kept the project-specific Python CI workflow.
+- Verified with `python3 scripts/validate_tasks.py`: 24 tasks valid.
+- Verified with `python3 scripts/sync_plans.py --check`: `Plans.md` in sync.
+- Verified with `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`: 46 passed.

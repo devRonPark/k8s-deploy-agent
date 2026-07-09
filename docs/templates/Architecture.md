@@ -1,29 +1,47 @@
-# Architecture
+# Architecture — [기능/프로젝트 이름]
 
-## Context
+작성일: YYYY-MM-DD
+기준 문서: docs/PRD.md
 
-`k8s-deploy-agent` runs inside customer-controlled on-premise environments and should remain useful without internet access.
+## 기술 스택
 
-## Components
+| 레이어 | 선택 | 근거 |
+|--------|------|------|
+| 런타임 | [Node.js / Python / Go / ...] | [왜] |
+| 프레임워크 | [...] | [왜] |
+| 저장소 | [...] | [왜] |
+| 배포 | [...] | [왜] |
 
-```text
-CLI / Local Web UI
-  -> Config Loader
-  -> Source Repo Adapter
-  -> Repository Analyzer
-  -> Asset Renderers
-  -> Redaction Guard
-  -> Optional On-prem LLM Adapter
+## 컴포넌트 경계
+
+> 컴포넌트마다: 무엇을 하나, 어떻게 쓰나, 무엇에 의존하나 — 세 가지가 답 가능해야 한다.
+
+```mermaid
+flowchart LR
+    Client[클라이언트] --> API[API 서버]
+    API --> DB[(저장소)]
+    API --> Ext[외부 서비스]
 ```
 
-## Boundaries
+| 컴포넌트 | 책임 (한 줄) | 의존 대상 |
+|----------|-------------|----------|
+| [이름] | [무엇을 하나] | [무엇에 기대나] |
 
-- Core generation must not require LLM availability.
-- LLM recommendations are advisory unless a later task adds explicit apply controls.
-- Secret values must not cross into generated files or logs.
+## 데이터 흐름
 
-## Verification
+> 핵심 시나리오 1~2개만. 모든 흐름을 그리지 말 것.
 
-```bash
-UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q
+```mermaid
+sequenceDiagram
+    participant U as 사용자
+    participant A as API
+    participant D as DB
+    U->>A: [요청]
+    A->>D: [조회/저장]
+    D-->>A: [결과]
+    A-->>U: [응답]
 ```
+
+## 비기능 요구
+
+- [성능/보안/운영 제약 중 이 프로젝트에 실제로 걸리는 것만 — 예: p95 < 300ms, PII 저장 금지]

@@ -1,24 +1,47 @@
-name: Bug
-description: Report a defect
-title: "[Bug] "
+name: Bug Report
+description: 버그 또는 예상치 못한 동작 보고
 labels: ["bug"]
 body:
   - type: textarea
-    id: observed
+    id: description
     attributes:
-      label: Observed behavior
+      label: 현상
+      description: 무슨 일이 발생했는가
     validations:
       required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 재현 방법
+      description: 최소 재현 절차
+    validations:
+      required: true
+
   - type: textarea
     id: expected
     attributes:
-      label: Expected behavior
+      label: 기대 동작
     validations:
       required: true
+
   - type: textarea
-    id: verification
+    id: error-output
     attributes:
-      label: Verification
-      description: Command, log, or reproduction steps
+      label: 에러 출력
+      description: 에러 메시지 또는 스택 트레이스
+      render: shell
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 영역
+      options:
+        - 기능
+        - UI / 표시
+        - 인증 / 보안
+        - 성능
+        - 설치 / 환경
+        - 기타
     validations:
       required: true

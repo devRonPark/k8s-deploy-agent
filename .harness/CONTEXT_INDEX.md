@@ -5,14 +5,30 @@ Use this index to avoid rereading unrelated files.
 | Path | Purpose |
 |------|---------|
 | `AGENTS.md` | Codex CLI project rules and harness workflow |
+| `CLAUDE.md` | Canonical harness rulebook shared by Claude Code and Codex procedures |
+| `BLUEPRINT.md` | Harness structure index and command mapping |
 | `harness.toml` | Project harness metadata, commands, and safety settings |
-| `Plans.md` | Task status source of truth |
+| `tasks/index.json` | Task status source of truth |
+| `Plans.md` | Human-readable snapshot generated from `tasks/index.json` |
 | `.harness/STATE.md` | Current session snapshot |
 | `.harness/HANDOFF.md` | Resume instructions for the next session |
 | `.harness/LOG.md` | Append-only work and error log |
 | `.harness/LESSONS.md` | Reusable prevention rules |
+| `.harness/RUN_REPORT.md` | Root run-report template for task-specific evidence |
+| `.harness/events/planning.jsonl` | Planning proposal event log |
+| `.harness/tasks/` | Task-specific live context directories |
 | `agents/task-decomposer.md` | Task splitting and planning gate |
 | `agents/test-agent.md` | Acceptance and test verification gate |
+| `agents/quality-gates.md` | Shared scope, YAGNI, review, and reporting gate |
+| `.agents/skills/` | Codex repo-scoped harness workflow skills |
+| `.claude/commands/` | Claude Code local command wrappers for harness workflows |
+| `scripts/tasklib.py` | Shared JSON-backed task state helpers |
+| `scripts/validate_tasks.py` | Validate `tasks/index.json` structure and task rules |
+| `scripts/sync_plans.py` | Regenerate `Plans.md` from `tasks/index.json` |
+| `scripts/build_planning_context.py` | Create planning proposal context runs |
+| `scripts/validate_task_proposal.py` | Validate proposed tasks before apply |
+| `scripts/apply_task_proposal.py` | Apply validated task proposals and sync plans |
+| `scripts/planning_log.py` | Append human-readable planning events |
 | `docs/demo-scenario.md` | Current demo workflow |
 | `docs/ui-ux-plan.md` | Future operator console plan |
 | `docs/PRD.md` | Operator console MVP product requirements |

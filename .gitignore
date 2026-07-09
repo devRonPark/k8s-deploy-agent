@@ -7,3 +7,13 @@ __pycache__/
 out/
 demo-test-output/
 .DS_Store
+
+# Project-scoped harness runtime outputs
+.claude/settings.local.json
+.claude/state/
+.claude/sessions/
+.claude/memory/
+.claude-plugin/
+out/progress-snapshot.html
+docs/.bkit-memory.json
+docs/.pdca-status.json

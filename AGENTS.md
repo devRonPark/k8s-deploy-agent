@@ -1,10 +1,15 @@
-# k8s-deploy-agent - Codex Harness Rules
+# k8s-deploy-agent — AGENTS.md
+
+Codex entrypoint for this harness template. Codex must operate from the same
+project rules, task sources, and verification gates that Claude Code uses.
 
 ## Project Overview
 
-`k8s-deploy-agent` automates repetitive Kubernetes migration preparation work in customer on-premise or air-gapped environments.
+`k8s-deploy-agent` automates repetitive Kubernetes migration preparation work
+in customer on-premise or air-gapped environments.
 
-The agent receives access to an application source repository, analyzes the repository, and generates initial CI/CD and GitOps assets for running the application on Kubernetes:
+The agent analyzes an application source repository and generates initial
+review artifacts for running the application on Kubernetes:
 
 - repository analysis report
 - Jenkinsfile for Jenkins Kubernetes Plugin based CI
@@ -12,133 +17,134 @@ The agent receives access to an application source repository, analyzes the repo
 - Rancher Fleet GitOps manifests
 - Kubernetes Namespace, Deployment, Service, and ConfigMap manifests
 - dry-run dashboard for operator review
+- review-only Dockerfile and `.dockerignore` proposals
 - secret redaction checks
 
-Future work will connect this agent to an on-premise LLM running on a Dell Pro Max GB10 device brought into the customer environment.
+Future work may connect this agent to an on-premise LLM running inside the
+customer environment. Do not introduce external SaaS calls.
 
 ## Runtime
 
 - Primary agent runtime: Codex CLI
 - Language: Python 3.11+
 - Package manager: uv
-- Test command: `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`
 - Entry point: `k8s-deploy-agent`
+- Default verification: `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`
 
-## Repository Layout
+## Read Order
 
-```text
-k8s-deploy-agent/
-├── analyzer.py
-├── cli.py
-├── config.py
-├── gitops.py
-├── jenkinsfile.py
-├── redaction.py
-├── report.py
-├── source_repo.py
-├── ui.py
-├── tests/
-├── docs/
-├── agents/
-├── .harness/
-├── Plans.md
-├── harness.toml
-└── pyproject.toml
-```
+At the start of a session, read these files before planning or editing:
 
-The installable package maps `k8s_deploy_agent` to the repository root through `pyproject.toml`.
+1. `CLAUDE.md`
+2. `harness.toml`
+3. `tasks/index.json`
+4. `Plans.md`
+5. `BLUEPRINT.md` when architecture or command provenance matters
 
-## Language Rules
+On resumed work, follow the recovery order in `CLAUDE.md`:
 
-- User-facing responses should be Korean unless the user asks otherwise.
-- Code, file paths, commands, config keys, and product names should stay in their native spelling.
-- Keep explanations concise and operational.
+1. `tasks/index.json` to identify the `wip` or user-specified Task
+2. `.harness/tasks/<task-key>/STATE.md`
+3. `.harness/tasks/<task-key>/RUN_REPORT.md` if it exists
+4. latest entries in `.harness/LESSONS.md`
+5. `Plans.md`
+6. only the extra files listed in `.harness/CONTEXT_INDEX.md` that are needed
 
-## Engineering Rules
+## Source Of Truth
 
-- Preserve offline/on-premise operation. Do not introduce external SaaS calls.
+- `CLAUDE.md` is the canonical harness rulebook for planning, implementation,
+  testing, review, GitHub flow, and `.harness/` state documents.
+- `tasks/index.json` is the task status source of truth.
+- `Plans.md` is a generated human-readable snapshot. Do not edit it directly;
+  run `python3 scripts/sync_plans.py` after task JSON changes.
+- `harness.toml` `[github]`, `[review]`, `[test]`, and `[plan]` sections are
+  summary indexes for the `CLAUDE.md` rules, not independently parsed runtime
+  configuration.
+- `agents/quality-gates.md` is the shared scope, YAGNI, review, and reporting
+  gate. Claude Code may get ponytail/caveman as plugin enhancements, but Codex
+  must apply the same principles from this repo file directly.
+
+## Project Engineering Rules
+
+- Preserve offline/on-premise operation.
 - Do not store secret values in config, generated files, logs, UI, or tests.
 - Use credential IDs or environment variable names instead of raw credentials.
 - Keep dry-run behavior deterministic and safe.
 - Prefer Python standard library unless a dependency clearly earns its cost.
 - Keep generated manifests simple and reviewable.
 - Keep source repository write-back and GitOps write-back behind explicit validation gates.
+- For UI/dashboard changes, also generate dry-run output and inspect `index.html` when practical.
 
-## Harness Workflow
+## Codex Compatibility Rules
 
-`Plans.md` is the task status source of truth.
+Claude Code slash commands and plugins may not exist in Codex. When a
+`CLAUDE.md` workflow names a slash command, perform the equivalent repository
+procedure directly:
 
-Allowed task states:
+| Claude Code workflow | Codex equivalent |
+|---|---|
+| `/grill-me` | Use `$grill-me` from `.agents/skills/grill-me/SKILL.md` for the interview and PRD procedure. |
+| `/harness-plan` | Use `$harness-plan` from `.agents/skills/harness-plan/SKILL.md` to build planning context, produce/validate a proposal, then apply it. |
+| `/harness-work` | Use `$harness-work` from `.agents/skills/harness-work/SKILL.md` to select a `todo` task, enforce the task-decomposer gate, implement, verify, and review. |
+| `/harness-review` | Use `$harness-review` from `.agents/skills/harness-review/SKILL.md` to review the diff against `CLAUDE.md`, the target task, and acceptance evidence. |
+| `/harness-progress` | Use `$harness-progress` from `.agents/skills/harness-progress/SKILL.md` for read-only progress summaries. |
+| `/harness-sync` | Use `$harness-sync` from `.agents/skills/harness-sync/SKILL.md` to validate `tasks/index.json` and regenerate `Plans.md`. |
+| Harness YAGNI trim | Use `$harness-yagni-trimmer` from `.agents/skills/harness-yagni-trimmer/SKILL.md` to review and reduce harness/template complexity for solo-builder use. |
 
-- `cc:TODO`
-- `cc:WIP`
-- `cc:완료`
+Do not assume the Claude Code plugin has performed any gate automatically.
+Codex must execute the same gates explicitly.
 
-Before implementation:
+Do not assume ponytail or caveman plugins run in Codex. When a Claude workflow
+relies on those plugins for scope control or terse reporting, use
+`agents/quality-gates.md` instead.
 
-1. Read `.harness/STATE.md`.
-2. Read recent `.harness/LESSONS.md` entries.
-3. Check `Plans.md` for the relevant task.
-4. If the task is too broad, use `agents/task-decomposer.md` and split it before implementation.
+## Git Workflow Helpers
 
-After implementation:
+| Claude Code command | Codex skill |
+|---|---|
+| `/branch-checkout` | `$branch-checkout` from `.agents/skills/branch-checkout/SKILL.md` |
+| `/git-push` | `$git-push` from `.agents/skills/git-push/SKILL.md` |
+| `/pr-create` | `$pr-create` from `.agents/skills/pr-create/SKILL.md` |
+| `/rescue-from-main` | `$rescue-from-main` from `.agents/skills/rescue-from-main/SKILL.md` |
 
-1. Run the task Acceptance command if present.
-2. Run the project test command.
-3. Update `.harness/LOG.md` for meaningful work or errors.
-4. Update `.harness/LESSONS.md` when an error produced a reusable prevention rule.
-5. Update `.harness/CONTEXT_INDEX.md` when adding or changing durable files.
+These helpers must inspect `git status` and the current branch before changing
+branches, pushing, or creating PRs. Never force push or discard local changes.
 
-## Test Rules
+## Mandatory Gates
 
-Default verification command:
+- Core workflow is `spec -> plan -> isolated work -> TDD -> fresh verification -> review -> finish`.
+- Before adding or changing task rows, use the planning proposal contract in
+  `CLAUDE.md` and the scripts:
+  `build_planning_context.py`, `validate_task_proposal.py`,
+  `apply_task_proposal.py`, and `sync_plans.py`.
+- Before implementation, confirm the selected task passes
+  `agents/task-decomposer.md` granularity criteria and
+  `agents/quality-gates.md` scope/YAGNI criteria.
+- After implementation and before review, follow `agents/test-agent.md`: run
+  the task Acceptance command and the relevant project test suite, and record
+  TDD or explicit exception evidence.
+- During review, apply `agents/quality-gates.md`: findings first, verification
+  evidence first, and only useful residual risk after approval.
+- Do not mark a task `done` unless the Acceptance evidence has passed. GitHub
+  Actions must not convert task status; the active agent updates
+  `tasks/index.json` and regenerates `Plans.md`.
 
-```bash
-UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q
-```
+## State Documents
 
-For UI/dashboard changes, also generate dry-run output and inspect `index.html` when practical.
+- Root `.harness/STATE.md`, `HANDOFF.md`, `TASKS.md`, `LOG.md`,
+  `CHECKPOINTS.md`, and `RUN_REPORT.md` are templates. Do not write live task
+  state into them.
+- Store live context under `.harness/tasks/<task-key>/` and update that Task's
+  `STATE.md` before risky work and after meaningful work units.
+- Append errors and fixes to `.harness/tasks/<task-key>/LOG.md`; add durable
+  prevention rules to root `.harness/LESSONS.md`.
+- Summarize decisions, changed files, verification evidence, and handoff risks
+  in `.harness/tasks/<task-key>/RUN_REPORT.md` after meaningful work or before
+  handoff.
+- Update `.harness/CONTEXT_INDEX.md` when creating a file or changing a file's
+  role.
 
-## Planning Rules
+## Response Language
 
-Use `agents/task-decomposer.md` before writing broad tasks into `Plans.md`.
-
-Good tasks:
-
-- change one concern
-- have an objective DoD
-- have a runnable Acceptance command
-- can fit in one focused PR
-
-Avoid tasks that combine repository analysis, UI, LLM, CI, and write-back in one row.
-
-## Review Rules
-
-Review should prioritize:
-
-- secret leakage
-- unsafe write-back behavior
-- air-gapped runtime regressions
-- generated Jenkinsfile or manifest correctness
-- missing tests for behavior changes
-- drift between `Plans.md`, `.harness/`, and implementation
-
-## UI/UX Direction
-
-The UI should evolve into an operator console for on-premise Kubernetes migration work.
-
-Current scope:
-
-- static dry-run dashboard
-
-Future scope after harness adoption:
-
-- local web operator console
-- config input flow
-- dry-run execution
-- generated asset preview
-- validation checklist
-- on-prem LLM recommendation panel
-- controlled write-back preparation
-
-See `docs/ui-ux-plan.md`.
+Use Korean for user-facing responses, unless the user requests otherwise.
+Keep code, commands, filenames, and proper nouns unchanged.

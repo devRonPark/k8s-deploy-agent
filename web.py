@@ -92,9 +92,10 @@ def validate_console_payload(values: Mapping[str, str]) -> ConsoleValidationResu
 
     source_env = payload.get("source_access_token_env", "")
     if source_env and not ENV_VAR_NAME_RE.fullmatch(source_env):
-        messages.append(
-            "source_access_token_env는 대문자 환경변수 이름이어야 합니다"
-        )
+        if source_input_mode == "clone":
+            messages.append(
+                "source_access_token_env는 대문자 환경변수 이름이어야 합니다"
+            )
 
     if source_input_mode not in SOURCE_INPUT_MODES:
         messages.append("source_input_mode는 clone 또는 local이어야 합니다")
@@ -108,6 +109,7 @@ def validate_console_payload(values: Mapping[str, str]) -> ConsoleValidationResu
                 "source_repo_url": local_source_repo_path,
                 "source_branch": "local",
                 "source_credential_id": "local-source",
+                "source_access_token_env": "",
             }
 
     try:
@@ -115,11 +117,16 @@ def validate_console_payload(values: Mapping[str, str]) -> ConsoleValidationResu
     except ValueError as error:
         messages.append(str(error))
 
-    redaction_values = {
-        **{field: str(values.get(field, "")).strip() for field, _, _ in FORM_FIELDS},
-        SOURCE_INPUT_MODE_FIELD: source_input_mode,
-        LOCAL_SOURCE_REPO_PATH_FIELD: local_source_repo_path,
-    }
+    redaction_values = {field: str(values.get(field, "")).strip() for field, _, _ in FORM_FIELDS}
+    if source_input_mode == "local":
+        for field in ("source_repo_url", "source_branch", "source_credential_id", "source_access_token_env"):
+            redaction_values[field] = ""
+    redaction_values.update(
+        {
+            SOURCE_INPUT_MODE_FIELD: source_input_mode,
+            LOCAL_SOURCE_REPO_PATH_FIELD: local_source_repo_path,
+        }
+    )
     redaction_probe = "\n".join(
         f"{field}: {value}"
         for field, value in redaction_values.items()
@@ -397,6 +404,12 @@ def render_operator_console(
     .field-grid {
       display: grid;
       gap: 10px;
+    }
+    form:has(input[name="source_input_mode"][value="clone"]:checked) .local-source-fields {
+      display: none;
+    }
+    form:has(input[name="source_input_mode"][value="local"]:checked) .clone-source-fields {
+      display: none;
     }
     .group-note {
       color: var(--muted);
@@ -1032,27 +1045,25 @@ def _form_inputs(values: Mapping[str, str] | None = None) -> str:
                 <span>{escape(label)}</span>
               </label>"""
         )
-    local_path_value = str(form_values.get(LOCAL_SOURCE_REPO_PATH_FIELD, "")).strip()
     groups = []
     source_mode_controls = f"""<fieldset class="source-mode">
           <legend>source 입력 mode</legend>
           <div class="radio-row">{''.join(mode_options)}</div>
-          <label>local source repository path
-            <input name="{escape(LOCAL_SOURCE_REPO_PATH_FIELD)}" value="{escape(local_path_value)}" placeholder="/srv/repos/payments-api">
-          </label>
         </fieldset>"""
     for title, note, field_names in FORM_GROUPS:
         controls = []
         if title == "Source repository":
             controls.append(source_mode_controls)
-        for name in field_names:
-            label, placeholder = FORM_FIELD_LOOKUP[name]
-            value = str(form_values.get(name, "")).strip()
-            controls.append(
-                f"""<label>{escape(label)}
-                  <input name="{escape(name)}" value="{escape(value)}" placeholder="{escape(placeholder)}">
-                </label>"""
-            )
+            controls.append(_source_repository_mode_fields(form_values))
+        else:
+            for name in field_names:
+                label, placeholder = FORM_FIELD_LOOKUP[name]
+                value = str(form_values.get(name, "")).strip()
+                controls.append(
+                    f"""<label>{escape(label)}
+                      <input name="{escape(name)}" value="{escape(value)}" placeholder="{escape(placeholder)}">
+                    </label>"""
+                )
         groups.append(
             f"""<fieldset class="form-group">
               <legend>{escape(title)}</legend>
@@ -1061,6 +1072,32 @@ def _form_inputs(values: Mapping[str, str] | None = None) -> str:
             </fieldset>"""
         )
     return "\n".join(groups)
+
+
+def _source_repository_mode_fields(form_values: Mapping[str, str]) -> str:
+    clone_fields = []
+    for name in ("source_repo_url", "source_branch", "source_credential_id", "source_access_token_env"):
+        label, placeholder = FORM_FIELD_LOOKUP[name]
+        if name == "source_credential_id":
+            label = "Source credential ID (Private repo only)"
+        value = str(form_values.get(name, "")).strip()
+        clone_fields.append(
+            f"""<label>{escape(label)}
+              <input name="{escape(name)}" value="{escape(value)}" placeholder="{escape(placeholder)}">
+            </label>"""
+        )
+    local_path_value = str(form_values.get(LOCAL_SOURCE_REPO_PATH_FIELD, "")).strip()
+    local_fields = f"""<label>local source repository path (absolute path)
+      <input name="{escape(LOCAL_SOURCE_REPO_PATH_FIELD)}" value="{escape(local_path_value)}" placeholder="/srv/repos/payments-api">
+    </label>"""
+    return f"""<fieldset class="clone-source-fields">
+          <legend>source repository URL clone</legend>
+          <div class="field-grid">{''.join(clone_fields)}</div>
+        </fieldset>
+        <fieldset class="local-source-fields">
+          <legend>서버 local path</legend>
+          <div class="field-grid">{local_fields}</div>
+        </fieldset>"""
 
 
 class OperatorConsoleHandler(BaseHTTPRequestHandler):

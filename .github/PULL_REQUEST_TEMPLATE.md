@@ -1,18 +1,25 @@
-## Summary
+## 요약
 
--
+<!-- 무엇을 바꿨는지 2~4줄로 설명합니다. 리뷰어가 diff를 읽기 전에 방향을 잡을 수 있어야 합니다. -->
 
-## Task
+## 배경
 
-Plans.md task:
+<!-- 왜 이 변경이 필요한지, 어떤 문제/요청/Task를 해결하는지 적습니다. 관련 이슈가 있으면 Closes #N을 포함합니다. -->
 
-## Verification
+## 주요 변경
 
-- [ ] Acceptance command
-- [ ] `UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q`
+<!-- 중요한 변경점을 항목으로 적습니다. 구현 세부보다 리뷰어가 확인해야 할 단위로 씁니다. -->
 
-## Safety
+- [변경 단위 1]
 
-- [ ] No raw secret values added
-- [ ] Offline/on-premise runtime preserved
-- [ ] Generated CI/GitOps behavior reviewed when relevant
+## 검증
+
+<!-- 실행한 명령과 결과를 적습니다. 실행하지 못한 검증은 이유를 적습니다. -->
+
+- [ ] [검증 명령 또는 확인 내용]
+
+---
+
+- [ ] CI 통과
+- [ ] DoD 항목 충족 (tasks/index.json 참고)
+- [ ] 관련 이슈 연결 (`Closes #N` 포함)
