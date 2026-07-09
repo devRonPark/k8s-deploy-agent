@@ -3,9 +3,13 @@ from collections import Counter
 from html.parser import HTMLParser
 from pathlib import Path
 
+import pytest
+
 import k8s_deploy_agent.cli as cli
 from k8s_deploy_agent.cli import main
+from k8s_deploy_agent.config import DemoConfig
 from k8s_deploy_agent.redaction import find_secret_leaks
+from k8s_deploy_agent.source_repo import clone_source_repository
 from k8s_deploy_agent.web import render_operator_console, run_console_dry_run, validate_console_payload
 
 
@@ -217,6 +221,48 @@ def test_dry_run_clones_source_repo_from_config_when_repo_is_omitted(tmp_path):
     report = (output / ".agent/reports/repository-analysis.md").read_text(encoding="utf-8")
     assert "| backend | python | backend | backend/Dockerfile |" in report
     assert "| frontend | node | frontend | frontend/Dockerfile |" in report
+
+
+def minimal_demo_config(**overrides: object) -> DemoConfig:
+    fields: dict[str, object] = {
+        "source_repo_url": "https://gitea.example.local/team/source.git",
+        "source_branch": "main",
+        "source_credential_id": "public-source",
+        "gitops_repo_url": "https://gitops.example.local/review-only.git",
+        "gitops_branch": "main",
+        "gitops_path": ".",
+        "gitops_credential_id": "review-only-gitops-credential",
+        "app_name": "demo",
+        "environment": "dev",
+    }
+    fields.update(overrides)
+    return DemoConfig(**fields)
+
+
+def test_clone_source_repository_anonymous_failure_includes_credential_hint(tmp_path):
+    config = minimal_demo_config(source_repo_url=(tmp_path / "missing-repo").as_posix())
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+
+    with pytest.raises(ValueError) as excinfo:
+        clone_source_repository(config, work_dir)
+
+    assert "private repository면 source credential ID를 입력하세요" in str(excinfo.value)
+
+
+def test_clone_source_repository_authenticated_failure_omits_credential_hint(tmp_path, monkeypatch):
+    monkeypatch.setenv("K8S_DEPLOY_AGENT_TEST_TOKEN", "x" * 40)
+    config = minimal_demo_config(
+        source_repo_url=(tmp_path / "missing-repo").as_posix(),
+        source_access_token_env="K8S_DEPLOY_AGENT_TEST_TOKEN",
+    )
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+
+    with pytest.raises(ValueError) as excinfo:
+        clone_source_repository(config, work_dir)
+
+    assert "private repository면 source credential ID를 입력하세요" not in str(excinfo.value)
 
 
 def test_redaction_detects_token_like_values_even_in_credential_id_fields():

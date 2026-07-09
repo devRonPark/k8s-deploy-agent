@@ -317,7 +317,7 @@
       "depends": [
         "7.1"
       ],
-      "status": "todo",
+      "status": "done",
       "gh": "-",
       "section": "Week 7 - Anonymous Source Clone Fix"
     }
