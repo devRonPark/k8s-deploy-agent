@@ -84,7 +84,7 @@
 
 | Task | 내용 | DoD | Acceptance | Depends | Status | GH |
 |------|------|-----|------------|---------|--------|----|
-| 7.1 | clone 모드에서 source_credential_id 없이 anonymous clone 허용 | config.py의 REQUIRED_FIELDS에서 source_credential_id가 제거되어 DemoConfig가 빈 credential을 허용한다. web.py의 clone 모드 검증은 하드코딩된 `_is_public_sample_clone`(FastAPI 데모 URL 전용) 없이, source_credential_id와 source_access_token_env가 모두 비어 있으면 임의의 URL에 대해 anonymous clone placeholder(`public-source`)를 채우고 검증을 통과시킨다. 기존 `PUBLIC_SAMPLE_REPO_URL`/`PUBLIC_SAMPLE_BRANCH`/`_is_public_sample_clone` 특수 케이스 코드는 삭제된다. | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | - | cc:TODO | - |
+| 7.1 | clone 모드에서 source_credential_id 없이 anonymous clone 허용 | web.py의 clone 모드 검증은 하드코딩된 URL만 예외 처리하던 `_is_public_sample_clone` 대신 일반화된 `_is_anonymous_clone`을 사용한다. source_credential_id와 source_access_token_env가 모두 비어 있으면 임의의 URL에 대해 anonymous clone placeholder(`public-source`)를 채우고 검증을 통과시킨다. FastAPI 데모 sample 버튼이 쓰는 `PUBLIC_SAMPLE_REPO_URL`/`PUBLIC_SAMPLE_BRANCH` 상수는 그대로 유지한다. | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | - | cc:완료 | - |
 | 7.2 | anonymous clone 인증 실패 시 안내 문구 추가 | source_repo.py의 clone_source_repository가 credential/token 없이(anonymous) clone을 시도했다가 실패하면, 기존 sanitized git stderr 메시지에 "private repository면 source credential ID를 입력하세요" 안내 문구를 덧붙여 ValueError를 발생시킨다. credential/token이 있었던 실패에는 안내 문구를 붙이지 않는다. | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q | 7.1 | cc:TODO | - |
 
 ---

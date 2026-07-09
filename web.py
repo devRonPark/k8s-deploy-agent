@@ -118,7 +118,7 @@ def validate_console_payload(values: Mapping[str, str]) -> ConsoleValidationResu
                 "source_credential_id": "local-source",
                 "source_access_token_env": "",
             }
-    elif _is_public_sample_clone(payload):
+    elif _is_anonymous_clone(payload):
         payload = {
             **payload,
             "source_credential_id": PUBLIC_SOURCE_CREDENTIAL_ID,
@@ -1146,13 +1146,10 @@ def _source_repository_mode_fields(form_values: Mapping[str, str]) -> str:
         </fieldset>"""
 
 
-def _is_public_sample_clone(payload: Mapping[str, str]) -> bool:
-    return (
-        str(payload.get("source_repo_url", "")).strip() == PUBLIC_SAMPLE_REPO_URL
-        and str(payload.get("source_branch", "")).strip() == PUBLIC_SAMPLE_BRANCH
-        and not str(payload.get("source_credential_id", "")).strip()
-        and not str(payload.get("source_access_token_env", "")).strip()
-    )
+def _is_anonymous_clone(payload: Mapping[str, str]) -> bool:
+    return not str(payload.get("source_credential_id", "")).strip() and not str(
+        payload.get("source_access_token_env", "")
+    ).strip()
 
 
 def _with_first_test_gitops_defaults(payload: Mapping[str, str]) -> dict[str, str]:

@@ -342,6 +342,25 @@ def test_console_payload_validation_public_github_clone_requires_only_url_and_br
     assert result.config.source_access_token_env is None
 
 
+def test_console_payload_validation_arbitrary_public_clone_allows_empty_credential():
+    result = validate_console_payload(
+        console_payload(
+            source_input_mode="clone",
+            source_repo_url="https://github.com/octocat/Hello-World.git",
+            source_branch="master",
+            source_credential_id="",
+            source_access_token_env="",
+        )
+    )
+
+    assert result.ok
+    assert result.config is not None
+    assert result.config.source_repo_url == "https://github.com/octocat/Hello-World.git"
+    assert result.config.source_branch == "master"
+    assert result.config.source_credential_id == "public-source"
+    assert result.config.source_access_token_env is None
+
+
 def test_console_payload_validation_allows_first_test_without_gitops_target():
     result = validate_console_payload(
         console_payload(
