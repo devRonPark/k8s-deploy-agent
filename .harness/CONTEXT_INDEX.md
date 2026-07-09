@@ -21,12 +21,15 @@ Use this index to avoid rereading unrelated files.
 | `.harness/tasks/8.1/` | Live context, evidence, and task snapshot for monorepo workspace service discovery work |
 | `.harness/tasks/8.2/` | Live context, evidence, and task snapshot for evidence-based port analyzer work |
 | `.harness/tasks/8.3/` | Live context, evidence, and task snapshot for env/dependency analyzer work |
+| `.harness/tasks/8.4/` | Live context, evidence, and task snapshot for WorkloadManifestPlan builder work |
+| `.harness/tasks/8.5/` | Live context, evidence, and task snapshot for GitOps renderer WorkloadManifestPlan migration |
 | `agents/task-decomposer.md` | Task splitting and planning gate |
 | `agents/test-agent.md` | Acceptance and test verification gate |
 | `agents/quality-gates.md` | Shared scope, YAGNI, review, and reporting gate |
 | `.agents/skills/` | Codex repo-scoped harness workflow skills |
 | `.claude/commands/` | Claude Code local command wrappers for harness workflows |
 | `scripts/tasklib.py` | Shared JSON-backed task state helpers |
+| `scripts/show_task.py` | Print one task's fields and depends status without reading the whole `tasks/index.json` |
 | `scripts/validate_tasks.py` | Validate `tasks/index.json` structure and task rules |
 | `scripts/sync_plans.py` | Regenerate `Plans.md` from `tasks/index.json` |
 | `scripts/build_planning_context.py` | Create planning proposal context runs |
@@ -48,8 +51,10 @@ Use this index to avoid rereading unrelated files.
 | `dockerfile_gate.py` | Dockerfile proposal confidence and unresolved-question gate |
 | `dockerfile_proposal.py` | Review-only Dockerfile proposal renderer |
 | `dockerfile_validation.py` | Dockerfile proposal validation report renderer |
+| `gitops.py` | GitOps Deployment/Service/ConfigMap YAML renderer, driven by `WorkloadManifestPlan.confirmed` (no `RepositoryAnalysis.services` guessing, no port fallback) |
 | `ui.py` | Static dry-run dashboard renderer |
 | `tests/test_cli_dry_run.py` | Main dry-run behavior tests |
 | `tests/test_build_profile.py` | BuildProfile analyzer behavior tests |
 | `tests/test_manifest_plan.py` | Workload manifest planning and port analysis behavior tests |
+| `tests/test_gitops_manifest_plan.py` | GitOps renderer confirmed-workload rendering and skip behavior tests |
 | `web.py` | Local operator console HTTP server, source input mode handling, and HTML shell |
