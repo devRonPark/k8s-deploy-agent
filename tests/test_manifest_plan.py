@@ -1,14 +1,31 @@
 from pathlib import Path
 
+from k8s_deploy_agent.analyzer import analyze_repository
+from k8s_deploy_agent.config import DemoConfig
 from k8s_deploy_agent.manifest_plan import (
     DependencyPlan,
     EnvVarPlan,
     PortCandidate,
+    build_workload_manifest_plans,
     collect_dependency_plans,
     collect_env_var_plans,
     collect_port_candidates,
 )
 from k8s_deploy_agent.redaction import is_public_config_key, is_secret_key
+
+
+def _demo_config() -> DemoConfig:
+    return DemoConfig(
+        source_repo_url="https://example.com/app.git",
+        source_branch="main",
+        source_credential_id="cred-source",
+        gitops_repo_url="https://example.com/gitops.git",
+        gitops_branch="main",
+        gitops_path="apps",
+        gitops_credential_id="cred-gitops",
+        app_name="demo",
+        environment="dev",
+    )
 
 
 def _candidate_map(candidates: tuple[PortCandidate, ...]) -> dict[tuple[str, str, int], PortCandidate]:
@@ -251,3 +268,126 @@ services:
     assert "not-output" not in rendered
     assert "mongodb://mongo/app" not in rendered
     assert "https://azure.example" not in rendered
+
+
+def _write_backend_with_expose(tmp_path: Path, name: str = "backend") -> None:
+    service = tmp_path / name
+    service.mkdir()
+    (service / "requirements.txt").write_text("fastapi\n", encoding="utf-8")
+    (service / "uv.lock").write_text("", encoding="utf-8")
+    (service / "Dockerfile").write_text("FROM python:3.12\nEXPOSE 8000\n", encoding="utf-8")
+    app = service / "app"
+    app.mkdir()
+    (app / "main.py").write_text("from fastapi import FastAPI\napp = FastAPI()\n", encoding="utf-8")
+
+
+def _write_backend_without_port_evidence(tmp_path: Path, name: str = "backend") -> None:
+    service = tmp_path / name
+    service.mkdir()
+    (service / "requirements.txt").write_text("fastapi\n", encoding="utf-8")
+    (service / "uv.lock").write_text("", encoding="utf-8")
+    (service / "Dockerfile").write_text("FROM python:3.12\n", encoding="utf-8")
+    app = service / "app"
+    app.mkdir()
+    (app / "main.py").write_text("from fastapi import FastAPI\napp = FastAPI()\n", encoding="utf-8")
+
+
+def test_workload_manifest_plan_confirms_service_and_combines_env_and_dependency_evidence(tmp_path: Path):
+    _write_backend_with_expose(tmp_path)
+    (tmp_path / "backend" / ".env.example").write_text(
+        "SECRET_KEY=super-secret\nPOSTGRES_SERVER=db\n", encoding="utf-8"
+    )
+
+    analysis = analyze_repository(tmp_path)
+    config = _demo_config()
+    result = build_workload_manifest_plans(config, analysis, "sha-123")
+
+    assert len(result.workloads) == 1
+    backend = result.workloads[0]
+    assert backend.service_name == "backend"
+    assert backend in result.confirmed
+    assert backend.confirmed
+    assert backend.container_port is not None
+    assert backend.container_port.value == 8000
+    assert backend.image == config.image_for("backend", "sha-123")
+
+    env_by_key = {plan.key: plan.category for plan in backend.env_plans}
+    assert env_by_key["SECRET_KEY"] == "secret"
+    assert env_by_key["POSTGRES_SERVER"] == "dependency"
+    assert "postgres" in {plan.name for plan in backend.dependency_plans}
+
+    rendered_evidence = "\n".join(backend.evidence)
+    assert "super-secret" not in rendered_evidence
+
+
+def test_workload_manifest_plan_confirms_via_nginx_reverse_proxy_even_without_confirmed_build_profile(
+    tmp_path: Path,
+):
+    frontend = tmp_path / "frontend"
+    frontend.mkdir()
+    (frontend / "package.json").write_text(
+        '{"scripts":{"build":"vite build"},"dependencies":{"vite":"latest"}}\n', encoding="utf-8"
+    )
+    (frontend / "nginx.conf").write_text("server { listen 80; }\n", encoding="utf-8")
+
+    analysis = analyze_repository(tmp_path)
+    build_profile = analysis.build_profiles[0]
+    assert not build_profile.confirmed
+
+    result = build_workload_manifest_plans(_demo_config(), analysis, "sha-123")
+    frontend_plan = result.workloads[0]
+
+    assert frontend_plan.confirmed
+    assert frontend_plan.container_port.value == 80
+    assert frontend_plan.container_port.kind == "reverse_proxy"
+    assert frontend_plan in result.confirmed
+
+
+def test_workload_manifest_plan_does_not_confirm_from_dockerfile_presence_alone(tmp_path: Path):
+    _write_backend_without_port_evidence(tmp_path)
+
+    analysis = analyze_repository(tmp_path)
+    build_profile = analysis.build_profiles[0]
+    assert build_profile.dockerfile_existing == "backend/Dockerfile"
+
+    result = build_workload_manifest_plans(_demo_config(), analysis, "sha-123")
+    backend = result.workloads[0]
+
+    assert backend.container_port is None
+    assert not backend.confirmed
+    assert backend not in result.confirmed
+    assert "no confirmed container port evidence found" in backend.unresolved_questions
+
+
+def test_workload_manifest_plan_marks_conflicting_confirmed_ports_as_unresolved(tmp_path: Path):
+    _write_backend_with_expose(tmp_path)
+    (tmp_path / "docker-compose.yml").write_text(
+        """
+services:
+  backend:
+    ports:
+      - "9000:9500"
+""",
+        encoding="utf-8",
+    )
+
+    analysis = analyze_repository(tmp_path)
+    result = build_workload_manifest_plans(_demo_config(), analysis, "sha-123")
+    backend = result.workloads[0]
+
+    assert backend.container_port is None
+    assert not backend.confirmed
+    assert any("conflicting confirmed container ports" in question for question in backend.unresolved_questions)
+
+
+def test_build_workload_manifest_plans_aggregates_confirmed_and_unresolved_across_services(tmp_path: Path):
+    _write_backend_with_expose(tmp_path, name="backend")
+    _write_backend_without_port_evidence(tmp_path, name="worker")
+
+    analysis = analyze_repository(tmp_path)
+    result = build_workload_manifest_plans(_demo_config(), analysis, "sha-123")
+
+    confirmed_names = {workload.service_name for workload in result.confirmed}
+    assert confirmed_names == {"backend"}
+    assert any(question.startswith("worker: ") for question in result.unresolved_questions)
+    assert not any(question.startswith("backend: ") for question in result.unresolved_questions)

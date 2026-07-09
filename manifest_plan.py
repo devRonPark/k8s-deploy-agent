@@ -5,6 +5,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from k8s_deploy_agent.analyzer import RepositoryAnalysis, ServiceCandidate
+from k8s_deploy_agent.build_profile import BuildProfile
+from k8s_deploy_agent.config import DemoConfig
 from k8s_deploy_agent.redaction import is_public_config_key, is_secret_key
 
 
@@ -112,6 +115,115 @@ def collect_dependency_plans(
 
     dependencies.extend(_compose_image_dependencies(root, service))
     return tuple(_dedupe_dependency_plans(dependencies))
+
+
+@dataclass(frozen=True)
+class WorkloadManifestPlan:
+    service_name: str
+    service_path: str
+    app_type: str
+    image: str
+    build_profile: BuildProfile
+    port_candidates: tuple[PortCandidate, ...]
+    container_port: PortCandidate | None
+    env_plans: tuple[EnvVarPlan, ...]
+    dependency_plans: tuple[DependencyPlan, ...]
+    evidence: tuple[str, ...]
+    confirmed: bool
+    unresolved_questions: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ManifestPlan:
+    workloads: tuple[WorkloadManifestPlan, ...]
+    confirmed: tuple[WorkloadManifestPlan, ...]
+    unresolved_questions: tuple[str, ...]
+
+
+def build_workload_manifest_plans(
+    config: DemoConfig,
+    analysis: RepositoryAnalysis,
+    image_tag: str,
+) -> ManifestPlan:
+    workloads = tuple(
+        _build_workload_plan(config, analysis.root, service, build_profile, image_tag)
+        for service, build_profile in zip(analysis.services, analysis.build_profiles)
+    )
+    confirmed = tuple(workload for workload in workloads if workload.confirmed)
+    unresolved_questions = tuple(
+        f"{workload.service_name}: {question}"
+        for workload in workloads
+        for question in workload.unresolved_questions
+    )
+    return ManifestPlan(workloads=workloads, confirmed=confirmed, unresolved_questions=unresolved_questions)
+
+
+def _build_workload_plan(
+    config: DemoConfig,
+    root: Path,
+    service: ServiceCandidate,
+    build_profile: BuildProfile,
+    image_tag: str,
+) -> WorkloadManifestPlan:
+    port_candidates = collect_port_candidates(
+        root,
+        service.path,
+        runtime_command=build_profile.runtime_command,
+        app_type=build_profile.app_type,
+    )
+    env_plans = collect_env_var_plans(root, service.path, app_type=build_profile.app_type)
+    dependency_plans = collect_dependency_plans(root, service.path, app_type=build_profile.app_type)
+
+    container_port, port_question = _select_container_port(port_candidates)
+
+    # BuildProfile.exposed_port only checks Dockerfile EXPOSE and a narrow
+    # per-app_type config list; the richer collect_port_candidates() result
+    # (nginx, compose, package scripts, ...) is the authoritative source here,
+    # so its own "exposed port" question is dropped in favor of port_question.
+    unresolved = [
+        question for question in build_profile.unresolved_questions if question != "exposed port is not confirmed"
+    ]
+    if port_question:
+        unresolved.append(port_question)
+
+    evidence = tuple(f"{item.field}: {item.value} ({item.path})" for item in build_profile.evidence)
+    if container_port is not None:
+        evidence = evidence + (
+            f"container_port: {container_port.value} ({container_port.evidence_path}, {container_port.reason})",
+        )
+
+    return WorkloadManifestPlan(
+        service_name=service.name,
+        service_path=build_profile.service_path,
+        app_type=build_profile.app_type,
+        image=config.image_for(service.name, image_tag),
+        build_profile=build_profile,
+        port_candidates=port_candidates,
+        container_port=container_port,
+        env_plans=env_plans,
+        dependency_plans=dependency_plans,
+        evidence=evidence,
+        confirmed=container_port is not None,
+        unresolved_questions=tuple(unresolved),
+    )
+
+
+def _select_container_port(
+    port_candidates: tuple[PortCandidate, ...],
+) -> tuple[PortCandidate | None, str | None]:
+    for kind in ("reverse_proxy", "container", "config"):
+        matches = [
+            candidate
+            for candidate in port_candidates
+            if candidate.confidence == "confirmed" and candidate.kind == kind
+        ]
+        if not matches:
+            continue
+        values = sorted({candidate.value for candidate in matches})
+        if len(values) > 1:
+            return None, f"conflicting confirmed container ports: {', '.join(str(value) for value in values)}"
+        return matches[0], None
+    return None, "no confirmed container port evidence found"
 
 
 def _resolve_service_path(root: Path, service_path: str | Path) -> Path:
