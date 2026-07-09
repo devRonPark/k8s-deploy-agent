@@ -18,6 +18,9 @@ Use this index to avoid rereading unrelated files.
 | `.harness/events/planning.jsonl` | Planning proposal event log |
 | `.harness/shared/planning/` | Planning context runs, proposed task files, and decomposition reports |
 | `.harness/tasks/` | Task-specific live context directories |
+| `.harness/tasks/8.1/` | Live context, evidence, and task snapshot for monorepo workspace service discovery work |
+| `.harness/tasks/8.2/` | Live context, evidence, and task snapshot for evidence-based port analyzer work |
+| `.harness/tasks/8.3/` | Live context, evidence, and task snapshot for env/dependency analyzer work |
 | `agents/task-decomposer.md` | Task splitting and planning gate |
 | `agents/test-agent.md` | Acceptance and test verification gate |
 | `agents/quality-gates.md` | Shared scope, YAGNI, review, and reporting gate |
@@ -41,10 +44,12 @@ Use this index to avoid rereading unrelated files.
 | `pyproject.toml` | Python package and script configuration |
 | `analyzer.py` | Repository service discovery and BuildProfile generation |
 | `build_profile.py` | Dockerfile proposal pre-analysis BuildProfile data model |
+| `manifest_plan.py` | Workload manifest planning models and deterministic port candidate analysis |
 | `dockerfile_gate.py` | Dockerfile proposal confidence and unresolved-question gate |
 | `dockerfile_proposal.py` | Review-only Dockerfile proposal renderer |
 | `dockerfile_validation.py` | Dockerfile proposal validation report renderer |
 | `ui.py` | Static dry-run dashboard renderer |
 | `tests/test_cli_dry_run.py` | Main dry-run behavior tests |
 | `tests/test_build_profile.py` | BuildProfile analyzer behavior tests |
+| `tests/test_manifest_plan.py` | Workload manifest planning and port analysis behavior tests |
 | `web.py` | Local operator console HTTP server, source input mode handling, and HTML shell |

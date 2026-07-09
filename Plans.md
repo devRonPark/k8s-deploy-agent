@@ -89,6 +89,21 @@
 
 ---
 
+## Week 8 - Evidence-based GitOps Manifest Planning
+
+| Task | 내용 | DoD | Acceptance | Depends | Status | GH |
+|------|------|-----|------------|---------|--------|----|
+| 8.1 | monorepo workspace service discovery 개선 | analyzer.py가 root-level app, backend/frontend/api/web/server/client, apps/*, services/*, packages/* 서비스 후보와 pnpm-workspace.yaml, turbo.json, nx.json, lerna.json, package.json workspaces 신호를 ignore directory 경계 안에서 감지한다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_build_profile.py -k monorepo | 4.1 | cc:완료 | - |
+| 8.2 | evidence 기반 port analyzer 추가 | manifest_plan.py 또는 동등 모듈에 PortCandidate 모델과 Dockerfile EXPOSE, docker-compose ports/expose/command, nginx listen, 명시 config/runtime command/package script port를 host/container/dev_server/reverse_proxy와 confirmed/inferred/unresolved로 구분하는 analyzer가 추가된다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_manifest_plan.py -k port | 8.1 | cc:완료 | - |
+| 8.3 | env var와 dependency analyzer 추가 | redaction.py가 public secret-key helper를 제공하고 manifest_plan.py 또는 동등 모듈이 .env/.env.example, docker-compose.yml, Python/Node/Java config에서 key 이름만 수집해 ConfigMap, Secret, public config, dependency manual action 후보를 raw value 없이 분류한다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_manifest_plan.py -k "env or dependency or redaction" | 8.1 | cc:완료 | - |
+| 8.4 | WorkloadManifestPlan builder 추가 | build_workload_manifest_plans(config, analysis, image_tag)가 service별 BuildProfile, port candidates, env plans, dependency plans, evidence를 결합해 confirmed workload와 unresolved_questions를 반환하고 Dockerfile proposal만으로는 confirmed manifest를 만들지 않는다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_manifest_plan.py -k workload | 8.2, 8.3 | cc:TODO | - |
+| 8.5 | GitOps renderer를 WorkloadManifestPlan 기반으로 전환 | gitops.py가 RepositoryAnalysis.services 직접 추측과 80 fallback 없이 WorkloadManifestPlan.confirmed workload만 Deployment, Service, ConfigMap YAML로 렌더링하고 confirmed container port를 containerPort와 targetPort에 사용한다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_gitops_manifest_plan.py | 8.4 | cc:TODO | - |
+| 8.6 | dry-run manual-actions.md report 추가 | dry-run output에 .agent/reports/manual-actions.md가 생성되고 skipped manifests, unresolved/conflicting ports, required secret keys, detected stateful/external dependencies, external exposure note, GitOps preview image tag와 Jenkins runtime image tag 차이를 기록한다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_cli_dry_run.py -k manual_actions | 8.5 | cc:TODO | - |
+| 8.7 | report와 dashboard를 manifest plan readiness로 전환 | repository-analysis.md와 index.html이 service별 app type, path, Dockerfile status, runtime command, port candidates, selected container port, config/secret keys, dependencies, manifest generation status, unresolved questions를 표시하고 dashboard ready 상태는 WorkloadManifestPlan.confirmed를 기준으로 계산된다 | UV_CACHE_DIR=.uv-cache /home/daolts/.local/bin/uv run pytest -q tests/test_cli_dry_run.py -k "manifest_plan or readiness" | 8.6 | cc:TODO | - |
+| 8.8 | README dry-run manifest analysis 원칙 업데이트 | README.md가 WorkloadManifestPlan 기반 dry-run 원칙, framework default port 금지, raw secret value 출력 금지, unresolved/manual action 처리, source/GitOps write-back 금지를 설명한다 | grep -q "WorkloadManifestPlan" README.md && grep -q "framework default" README.md && grep -q "manual action" README.md | 8.7 | cc:TODO | - |
+
+---
+
 <!--
 Task 상태의 단일 출처는 tasks/index.json이다.
 Plans.md는 사람이 필요할 때 python3 scripts/sync_plans.py로 갱신하는

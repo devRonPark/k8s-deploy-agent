@@ -353,7 +353,7 @@
       "depends": [
         "8.1"
       ],
-      "status": "done",
+      "status": "todo",
       "gh": "-",
       "section": "Week 8 - Evidence-based GitOps Manifest Planning"
     },

@@ -1,0 +1,205 @@
+{
+  "run_id": "plan-20260709-161228-c2f2fc",
+  "created_at": "2026-07-09T16:12:28+09:00",
+  "request": "Introduce evidence-based WorkloadManifestPlan for dry-run GitOps generation",
+  "documents": [
+    {
+      "label": "PRD",
+      "path": "docs/PRD.md",
+      "exists": true
+    },
+    {
+      "label": "User Flow",
+      "path": "docs/UserFlow.md",
+      "exists": true
+    },
+    {
+      "label": "Design",
+      "path": "docs/DESIGN.md",
+      "exists": false
+    },
+    {
+      "label": "Architecture",
+      "path": "docs/Architecture.md",
+      "exists": true
+    }
+  ],
+  "existing_tasks": [
+    {
+      "id": "0.1",
+      "title": "Codex harness 기본 파일 추가",
+      "status": "done",
+      "section": "Week 0 - Harness Bootstrap"
+    },
+    {
+      "id": "0.2",
+      "title": "Python CLI 검증 명령 고정",
+      "status": "done",
+      "section": "Week 0 - Harness Bootstrap"
+    },
+    {
+      "id": "0.3",
+      "title": "GitHub Actions CI 추가",
+      "status": "done",
+      "section": "Week 0 - Harness Bootstrap"
+    },
+    {
+      "id": "1.1",
+      "title": "Local operator console PRD 작성",
+      "status": "done",
+      "section": "Week 1 - Operator Console Planning"
+    },
+    {
+      "id": "1.2",
+      "title": "UI flow와 architecture 작성",
+      "status": "done",
+      "section": "Week 1 - Operator Console Planning"
+    },
+    {
+      "id": "2.1",
+      "title": "`web` command 기본 local console shell 추가",
+      "status": "done",
+      "section": "Week 2 - Local Operator Console"
+    },
+    {
+      "id": "2.2",
+      "title": "operator console config form payload 검증 추가",
+      "status": "done",
+      "section": "Week 2 - Local Operator Console"
+    },
+    {
+      "id": "2.3",
+      "title": "operator console dry-run 실행 연결",
+      "status": "done",
+      "section": "Week 2 - Local Operator Console"
+    },
+    {
+      "id": "2.4",
+      "title": "generated asset preview와 validation checklist 추가",
+      "status": "done",
+      "section": "Week 2 - Local Operator Console"
+    },
+    {
+      "id": "3.1",
+      "title": "Dockerfile 자동 생성 범위 정의",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.2",
+      "title": "BuildProfile 데이터 모델 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.3",
+      "title": "repository analyzer BuildProfile 생성",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.4",
+      "title": "runtime command와 port evidence 분석",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.5",
+      "title": "Dockerfile proposal gate 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.6",
+      "title": "BuildProfile 리포트 출력 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.7",
+      "title": "Python Dockerfile proposal preview 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.8",
+      "title": "Node.js Dockerfile proposal preview 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.9",
+      "title": "Java Dockerfile proposal preview 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.10",
+      "title": "Go Dockerfile proposal preview 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.11",
+      "title": "`.dockerignore` proposal preview 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "3.12",
+      "title": "Dockerfile proposal validation checklist 추가",
+      "status": "done",
+      "section": "Week 3 - Dockerfile Generation Planning"
+    },
+    {
+      "id": "4.1",
+      "title": "root-level app repository 감지 추가",
+      "status": "done",
+      "section": "Week 4 - Repository Shape Coverage"
+    },
+    {
+      "id": "5.1",
+      "title": "web form에서 local repo path 분석 지원",
+      "status": "done",
+      "section": "Week 5 - Web Local Source Input"
+    },
+    {
+      "id": "6.1",
+      "title": "operator console 단계형 UI/UX 개편",
+      "status": "done",
+      "section": "Week 6 - Operator Console UX"
+    },
+    {
+      "id": "6.2",
+      "title": "web console public GitHub sample clone preset 추가",
+      "status": "done",
+      "section": "Week 6 - Operator Console UX"
+    },
+    {
+      "id": "7.1",
+      "title": "clone 모드에서 source_credential_id 없이 anonymous clone 허용",
+      "status": "done",
+      "section": "Week 7 - Anonymous Source Clone Fix"
+    },
+    {
+      "id": "7.2",
+      "title": "anonymous clone 인증 실패 시 안내 문구 추가",
+      "status": "done",
+      "section": "Week 7 - Anonymous Source Clone Fix"
+    }
+  ],
+  "rules": {
+    "task_decomposer": "agents/task-decomposer.md",
+    "task_state_source": "tasks/index.json",
+    "readable_plan": "Plans.md"
+  },
+  "outputs": {
+    "run_dir": ".harness/shared/planning/runs/plan-20260709-161228-c2f2fc",
+    "proposal": ".harness/shared/planning/runs/plan-20260709-161228-c2f2fc/proposed-tasks.json",
+    "report": ".harness/shared/planning/runs/plan-20260709-161228-c2f2fc/decomposition-report.md"
+  },
+  "technical": {
+    "schema_version": 1,
+    "proposal_dir": ".harness/shared/planning"
+  }
+}
