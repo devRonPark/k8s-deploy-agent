@@ -9,8 +9,8 @@ Codex에서 Claude Code `/harness-work`에 해당하는 절차를 직접 수행�
 
 ## 절차
 
-1. `AGENTS.md`, `CLAUDE.md`, `agents/quality-gates.md`, `tasks/index.json`, `Plans.md`, 최근 `.harness/LESSONS.md`를 읽는다. 진행 중인 Task가 있으면 `.harness/tasks/<task-key>/STATE.md`도 읽는다.
-2. 수행할 `todo` Task 하나를 고른다. 사용자가 지정한 Task가 있으면 그 Task를 우선한다.
+1. `AGENTS.md`, `CLAUDE.md`, `agents/quality-gates.md`, 최근 `.harness/LESSONS.md`를 읽는다. 진행 중인 Task가 있으면 `.harness/tasks/<task-key>/STATE.md`도 읽는다.
+2. 수행할 `todo` Task 하나를 고른다. 사용자가 지정한 Task가 있으면 그 Task를 우선한다. 대상 Task가 이미 정해져 있으면 `tasks/index.json` 전체 대신 `python3 scripts/show_task.py <task-id>`로 해당 Task와 depends 상태만 조회한다. 아직 고르지 않았거나 여러 Task를 비교해야 하면 `Plans.md` 또는 `tasks/index.json` 전체를 읽는다.
 3. 구현 전 `agents/task-decomposer.md`의 세분화 기준과 `agents/quality-gates.md`의 scope/YAGNI 체크를 확인한다.
 4. 기준 미달이면 구현하지 말고 `$harness-plan` 절차로 하위 Task proposal을 만든다.
 5. 기준 통과 시 `.harness/tasks/<task-key>/STATE.md`를 갱신하고 구현한다. Task 디렉토리가 없으면 루트 `.harness/*.md` 템플릿을 복사해 만든다.

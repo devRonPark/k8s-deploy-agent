@@ -54,7 +54,7 @@ Planning 로그의 최상위 `step`, `result`, `message`, `next_action`은 사�
 - Task 상태는 `tasks/index.json`만 믿는다. `.harness/tasks/<task-key>/`는 세션 맥락만 담는다.
 - 루트 `.harness/{STATE,HANDOFF,TASKS,LOG,CHECKPOINTS,RUN_REPORT}.md`는 새 Task용 템플릿이다.
 - 새 Task 착수 시 루트 템플릿을 `.harness/tasks/<task-key>/`로 복사한다. 필요하면 `tasks.index.snapshot.json`도 저장한다.
-- 세션 재개 읽기 순서: `tasks/index.json` -> `.harness/tasks/<task-key>/STATE.md` -> 있으면 `RUN_REPORT.md` -> `.harness/LESSONS.md` 최근 항목 -> `Plans.md` -> 필요한 파일만 `.harness/CONTEXT_INDEX.md`에서 선택.
+- 세션 재개 읽기 순서: 대상 Task 하나만 확인할 때는 `tasks/index.json` 전체를 읽지 말고 `python3 scripts/show_task.py <task-id>`로 해당 Task와 depends 상태만 조회한다 -> `.harness/tasks/<task-key>/STATE.md` -> 있으면 `RUN_REPORT.md` -> `.harness/LESSONS.md` 최근 항목 -> `Plans.md` -> 필요한 파일만 `.harness/CONTEXT_INDEX.md`에서 선택. 여러 Task 상태를 한 번에 봐야 하거나(`/harness-plan`의 ID 충돌 확인, 전체 진행률 등) `tasks/index.json` 구조 자체를 다뤄야 할 때만 전체 파일을 읽는다.
 - 에러는 Task `LOG.md`에 원문 기록한다. 반복 방지 규칙은 `.harness/LESSONS.md`에 남긴다.
 - 새 파일을 만들거나 파일 역할이 바뀌면 `.harness/CONTEXT_INDEX.md`를 갱신한다.
 - 요청이 전제한 파일이 없으면 임의 생성하지 말고 사용자에게 보고한다.
